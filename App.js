@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { View, Button, Text, StyleSheet, TouchableOpacity, Alert } from "react-native";
+import { View, Button, Text, StyleSheet, TouchableOpacity, Alert, Image } from "react-native";
+import Svg, { Circle, Line } from "react-native-svg";
 import * as ImagePicker from "expo-image-picker";
 import axios from "axios";
 
@@ -7,65 +8,105 @@ export default function App() {
   const [data, setData] = useState({});
   const [selectedExercise, setSelectedExercise] = useState(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [videoUri, setVideoUri] = useState(null);
+  const [imageUri, setImageUri] = useState(null);
 
-  const backend = "http://192.168.x.x:8000"; // update if backend IP changes
+  const backend = "http://192.168.1.6:8000"; // ✅ your backend IP
 
-  // ✅ Start Live Exercise Session
+  // Start a new exercise session
   const startExercise = async (exerciseName) => {
     try {
       setSelectedExercise(exerciseName);
       const res = await axios.post(`${backend}/start_session`, {
         exercise: exerciseName,
-        user_id: "1", // You can make this dynamic later
+        user_id: "1",
       });
+      console.log("Session started:", res.data);
       setIsTracking(true);
-      Alert.alert("Session Started", `Tracking ${exerciseName}`);
+      Alert.alert("✅ Session Started", `Tracking ${exerciseName}`);
     } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Could not start exercise session.");
+      console.error("Start session error:", err.message);
+      Alert.alert("❌ Error", "Could not start exercise session.");
     }
   };
 
-  // ✅ Stop Live Tracking
+  // Stop exercise session
   const stopExercise = async () => {
-    setSelectedExercise(null);
-    setIsTracking(false);
-    setData({});
-    Alert.alert("Session Stopped", "Exercise tracking stopped.");
+    try {
+      await axios.post(`${backend}/stop_session`);
+      setSelectedExercise(null);
+      setIsTracking(false);
+      setData({});
+      setVideoUri(null);
+      setImageUri(null);
+      Alert.alert("🛑 Session Stopped", "Exercise tracking stopped.");
+    } catch (err) {
+      console.error("Stop error:", err.message);
+    }
   };
 
-  // ✅ Upload recorded video for analysis
+  // Upload a video to backend
   const uploadVideo = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Videos,
-        allowsEditing: false,
+        allowsEditing: true,
       });
 
       if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        setVideoUri(uri);
+
         const formData = new FormData();
         formData.append("file", {
-          uri: result.assets[0].uri,
-          type: "video/mp4",
+          uri,
           name: "exercise_video.mp4",
+          type: "video/mp4",
         });
-        formData.append("exercise", selectedExercise || "squat");
-        formData.append("user_id", "1");
 
         const res = await axios.post(`${backend}/analyze_frame`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
 
         setData(res.data);
-        Alert.alert("Video Analysis Complete", `Form: ${res.data.form}`);
+        Alert.alert("📹 Video uploaded", "Processing completed!");
       }
     } catch (err) {
-      console.error(err);
-      Alert.alert("Error", "Failed to upload or analyze video.");
+      console.error("Upload error:", err.message);
+      Alert.alert("❌ Error", "Failed to upload video.");
     }
   };
 
-  // ✅ Polling data for live tracking (every 1 sec)
+  // Use live camera to capture an image (single frame)
+  const captureFrame = async () => {
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+      });
+
+      if (!result.canceled) {
+        const uri = result.assets[0].uri;
+        setImageUri(uri);
+
+        const formData = new FormData();
+        formData.append("file", {
+          uri,
+          name: "frame.jpg",
+          type: "image/jpeg",
+        });
+
+        const res = await axios.post(`${backend}/analyze_frame`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+
+        setData(res.data);
+      }
+    } catch (err) {
+      console.error("Camera error:", err.message);
+    }
+  };
+
+  // Poll live data every 1s
   useEffect(() => {
     let interval;
     if (isTracking && selectedExercise) {
@@ -81,25 +122,51 @@ export default function App() {
     return () => clearInterval(interval);
   }, [isTracking, selectedExercise]);
 
+  // ✅ Draw skeleton based on backend keypoints
+  const renderSkeleton = () => {
+    if (!data.keypoints) return null;
+    const width = 300, height = 300;
+
+    const getCoord = (x, y) => ({
+      cx: x * width,
+      cy: y * height,
+    });
+
+    const points = {};
+    data.keypoints.forEach((kp) => {
+      points[kp.name] = getCoord(kp.x, kp.y);
+    });
+
+    return (
+      <Svg height={height} width={width} style={styles.skeletonBox}>
+        {points.shoulder && points.elbow && (
+          <Line x1={points.shoulder.cx} y1={points.shoulder.cy} x2={points.elbow.cx} y2={points.elbow.cy} stroke="blue" strokeWidth="3" />
+        )}
+        {points.elbow && points.wrist && (
+          <Line x1={points.elbow.cx} y1={points.elbow.cy} x2={points.wrist.cx} y2={points.wrist.cy} stroke="blue" strokeWidth="3" />
+        )}
+        {Object.values(points).map((p, i) => (
+          <Circle key={i} cx={p.cx} cy={p.cy} r="5" fill="red" />
+        ))}
+      </Svg>
+    );
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🏋️‍♂️ Physiotherapy Exercise Tracker</Text>
+      <Text style={styles.title}>🏋️ Physiotherapy Exercise Tracker</Text>
 
-      {/* Exercise Buttons */}
-      <View style={styles.buttonGroup}>
-        {["bicep_curl", "squat", "shoulder_abduction", "knee_extension", "leg_raise", "side_bend"].map((name) => (
-          <TouchableOpacity
-            key={name}
-            style={styles.button}
-            onPress={() => startExercise(name)}
-          >
-            <Text style={styles.buttonText}>{name.replace("_", " ")}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {!isTracking && (
+        <View style={styles.buttonGroup}>
+          {["bicep_curl", "squat", "shoulder_abduction", "knee_extension", "leg_raise", "side_bend"].map((name) => (
+            <TouchableOpacity key={name} style={styles.button} onPress={() => startExercise(name)}>
+              <Text style={styles.buttonText}>{name.replace("_", " ")}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
-      {/* Exercise Data */}
-      {selectedExercise && (
+      {isTracking && (
         <View style={styles.dataBox}>
           <Text style={styles.info}>Exercise: {selectedExercise}</Text>
           <Text style={styles.info}>Angle: {data.angle?.toFixed?.(2) || "—"}</Text>
@@ -107,15 +174,26 @@ export default function App() {
           <Text style={styles.info}>Stage: {data.stage || "—"}</Text>
           <Text style={styles.info}>Form: {data.form || "—"}</Text>
 
-          <Button title="Stop Live Tracking" onPress={stopExercise} color="#FF4444" />
-          <Button title="Upload Video for Analysis" onPress={uploadVideo} color="#007AFF" />
+          <View style={{ marginVertical: 20 }}>
+            {imageUri && <Image source={{ uri: imageUri }} style={styles.imagePreview} />}
+            {renderSkeleton()}
+          </View>
+
+          <TouchableOpacity style={styles.uploadBtn} onPress={uploadVideo}>
+            <Text style={styles.uploadText}>Upload Video 🎥</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.captureBtn} onPress={captureFrame}>
+            <Text style={styles.captureText}>Capture Frame 📸</Text>
+          </TouchableOpacity>
+
+          <Button title="Stop Session" onPress={stopExercise} color="#FF4444" />
         </View>
       )}
     </View>
   );
 }
 
-// ================== Styles ==================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -134,7 +212,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "center",
-    marginBottom: 30,
   },
   button: {
     backgroundColor: "#4CAF50",
@@ -159,5 +236,35 @@ const styles = StyleSheet.create({
   info: {
     fontSize: 16,
     marginVertical: 4,
+  },
+  skeletonBox: {
+    backgroundColor: "#eee",
+    borderRadius: 10,
+  },
+  uploadBtn: {
+    backgroundColor: "#2196F3",
+    padding: 10,
+    borderRadius: 10,
+    marginVertical: 5,
+  },
+  uploadText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  captureBtn: {
+    backgroundColor: "#FF9800",
+    padding: 10,
+    borderRadius: 10,
+    marginVertical: 5,
+  },
+  captureText: {
+    color: "#fff",
+    fontWeight: "600",
+  },
+  imagePreview: {
+    width: 300,
+    height: 200,
+    borderRadius: 10,
+    marginBottom: 10,
   },
 });

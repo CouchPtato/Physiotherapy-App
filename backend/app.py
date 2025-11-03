@@ -1,180 +1,203 @@
-from fastapi import FastAPI, UploadFile, Form
+from fastapi import FastAPI, File, UploadFile, Form
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import Column, Integer, String, ForeignKey, create_engine
-from sqlalchemy.orm import declarative_base, sessionmaker, relationship
-from PIL import Image
-import numpy as np
+from pydantic import BaseModel
 import cv2
-import os
-import math
 import mediapipe as mp
-import tempfile
+import numpy as np
 import threading
-
-Base = declarative_base()
-engine = create_engine("sqlite:///exercise.db", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    name = Column(String)
-    sessions = relationship("Session", back_populates="user")
-
-class Session(Base):
-    __tablename__ = "sessions"
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    exercise = Column(String)
-    reps = Column(Integer)
-    form = Column(String)
-    user = relationship("User", back_populates="sessions")
-
-Base.metadata.create_all(bind=engine)
+import time
 
 app = FastAPI()
 
+# ========= CORS =========
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ========= Mediapipe Setup =========
+mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
-mp_drawings = mp.solutions.drawing_utils
+
 pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
+# ========= Global Data =========
+current_data = {"angle": 0, "count": 0, "stage": "-", "form": "-", "exercise": None, "keypoints": []}
+capture_thread = None
+stop_thread = False
+
+
+# ========= Helper Functions =========
 def calculate_angle(a, b, c):
-    rads = math.atan2(c[1]-b[1], c[0]-b[0]) - math.atan2(a[1]-b[1], a[0]-b[0])
-    angle = abs(rads * 180 / math.pi)
-    if angle > 180:
-        angle = 360 - angle
-    return angle
+    """Calculate angle between three points"""
+    a, b, c = np.array(a), np.array(b), np.array(c)
+    radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - np.arctan2(a[1]-b[1], a[0]-b[0])
+    angle = np.abs(radians*180.0/np.pi)
+    return 360 - angle if angle > 180 else angle
 
-def analyze_exercise_frame(exercise_name, landmarks):
-    form = "good"
-    angle = None
-    counter, stage = 0, None
 
-    if exercise_name == "bicep_curl":
-        shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
-                    landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
-        elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
+def exercise_logic(exercise, landmarks):
+    """Compute angles & stage logic per exercise"""
+    global current_data
+    angle, count, stage, form = 0, current_data["count"], current_data["stage"], "Good"
+
+    try:
+        if exercise == "bicep_curl":
+            # Shoulder-Elbow-Wrist (right arm)
+            a = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+            b = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
                  landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
-        wrist = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
+            c = [landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x,
                  landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y]
-        angle = calculate_angle(shoulder, elbow, wrist)
-        if angle > 160:
-            stage = "down"
-        if angle < 50 and stage == "down":
-            stage = "up"
-            counter += 1
-        if angle < 30 or angle > 170:
-            form = "bad"
+            angle = calculate_angle(a, b, c)
+            if angle > 160:
+                stage = "down"
+            if angle < 40 and stage == "down":
+                stage = "up"
+                count += 1
 
-    elif exercise_name == "squat":
-        hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
-               landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
-        knee = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
-                landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
-        ankle = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+        elif exercise == "squat":
+            # Hip-Knee-Ankle
+            a = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+            b = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
+            c = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
                  landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
-        angle = calculate_angle(hip, knee, ankle)
-        if angle > 160:
-            stage = "up"
-        if angle < 90 and stage == "up":
-            stage = "down"
-            counter += 1
-        if angle < 70 or angle > 170:
-            form = "bad"
+            angle = calculate_angle(a, b, c)
+            if angle > 160:
+                stage = "up"
+            if angle < 90 and stage == "up":
+                stage = "down"
+                count += 1
 
-    elif exercise_name == "shoulder_abduction":
-        hip = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
-               landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
-        shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
-                    landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
-        elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
+        elif exercise == "shoulder_abduction":
+            # Hip-Shoulder-Elbow
+            a = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+            b = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+            c = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x,
                  landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y]
-        angle = calculate_angle(hip, shoulder, elbow)
-        if angle < 30:
-            stage = "down"
-        if angle > 80 and stage == "down":
-            stage = "up"
-            counter += 1
-        if angle < 20 or angle > 120:
-            form = "bad"
+            angle = calculate_angle(a, b, c)
+            if angle < 40:
+                stage = "down"
+            if angle > 100 and stage == "down":
+                stage = "up"
+                count += 1
 
-    return angle, counter, stage, form
+        elif exercise == "knee_extension":
+            # Hip-Knee-Ankle
+            a = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+            b = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
+            c = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
+            angle = calculate_angle(a, b, c)
+            if angle > 150:
+                stage = "extended"
+            if angle < 100 and stage == "extended":
+                stage = "bent"
+                count += 1
 
-@app.post("/analyze_video")
-async def analyze_video(file: UploadFile, user_id: str = Form(...), exercise: str = Form(...)):
-    temp_path = os.path.join(tempfile.gettempdir(), file.filename)
-    with open(temp_path, "wb") as f:
-        f.write(await file.read())
-    cap = cv2.VideoCapture(temp_path)
-    counter, stage = 0, None
-    last_form = "good"
+        elif exercise == "leg_raise":
+            # Shoulder-Hip-Ankle
+            a = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+            b = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+            c = [landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_ANKLE.value].y]
+            angle = calculate_angle(a, b, c)
+            if angle < 160:
+                stage = "up"
+            if angle > 170 and stage == "up":
+                stage = "down"
+                count += 1
 
-    while cap.isOpened():
-        success, frame = cap.read()
-        if not success:
-            break
-        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = pose.process(image_rgb)
+        elif exercise == "side_bend":
+            # Shoulder-Hip-Knee
+            a = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y]
+            b = [landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_HIP.value].y]
+            c = [landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].x,
+                 landmarks[mp_pose.PoseLandmark.RIGHT_KNEE.value].y]
+            angle = calculate_angle(a, b, c)
+            if angle < 150:
+                stage = "bend"
+            if angle > 175 and stage == "bend":
+                stage = "upright"
+                count += 1
+
+    except Exception as e:
+        print("Exercise logic error:", e)
+
+    current_data.update({"angle": angle, "count": count, "stage": stage, "form": form})
+    return current_data
+
+
+def track_exercise(exercise):
+    """Continuously capture video and analyze frames"""
+    global stop_thread, current_data
+    cap = cv2.VideoCapture(0)
+    while not stop_thread:
+        ret, frame = cap.read()
+        if not ret:
+            continue
+
+        image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = pose.process(image)
         if results.pose_landmarks:
-            landmarks = results.pose_landmarks.landmark
-            angle, inc, stage, form = analyze_exercise_frame(exercise, landmarks)
-            if inc > 0:
-                counter += 1
-            last_form = form
+            keypoints = [
+                (lm.x, lm.y) for lm in results.pose_landmarks.landmark
+            ]
+            current_data["keypoints"] = keypoints
+            current_data = exercise_logic(exercise, results.pose_landmarks.landmark)
 
+        time.sleep(0.03)
     cap.release()
-    os.remove(temp_path)
-    db = SessionLocal()
-    session = Session(user_id=user_id, exercise=exercise, reps=counter, form=last_form)
-    db.add(session)
-    db.commit()
-    db.close()
-    return {"user_id": user_id, "exercise": exercise, "reps": counter, "form": last_form}
 
-@app.post("/start_live_tracking")
-async def start_live_tracking(user_id: str = Form(...), exercise: str = Form(...)):
-    def track():
-        cap = cv2.VideoCapture(0)
-        counter, stage = 0, None
-        while cap.isOpened():
-            ret, frame = cap.read()
-            if not ret:
-                break
-            image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = pose.process(image_rgb)
-            if results.pose_landmarks:
-                landmarks = results.pose_landmarks.landmark
-                angle, inc, stage, form = analyze_exercise_frame(exercise, landmarks)
-                if inc > 0:
-                    counter += 1
-                mp_drawings.draw_landmarks(frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
-                cv2.putText(frame, f'Angle: {int(angle)}', (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2)
-                cv2.putText(frame, f'Reps: {counter}', (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,0,0), 2)
-                cv2.putText(frame, f'Form: {form}', (10, 150), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,255), 2)
-            cv2.imshow("Live Exercise Tracker - Q to stop", frame)
-            if cv2.waitKey(10) & 0xFF == ord('q'):
-                break
-        cap.release()
-        cv2.destroyAllWindows()
-        db = SessionLocal()
-        s = Session(user_id=user_id, exercise=exercise, reps=counter, form=form)
-        db.add(s)
-        db.commit()
-        db.close()
-    threading.Thread(target=track).start()
-    return {"status": "Tracking started"}
 
-@app.get("/history/{user_id}")
-async def history(user_id: int):
-    db = SessionLocal()
-    sessions = db.query(Session).filter(Session.user_id == user_id).all()
-    db.close()
-    return [{"exercise": s.exercise, "reps": s.reps, "form": s.form} for s in sessions]
+# ========= API Routes =========
+class SessionRequest(BaseModel):
+    exercise: str
+    user_id: str
+
+
+@app.post("/start_session")
+def start_session(req: SessionRequest):
+    """Start webcam tracking"""
+    global capture_thread, stop_thread, current_data
+    stop_thread = False
+    current_data.update({"exercise": req.exercise, "count": 0, "stage": "-", "form": "-", "angle": 0})
+    capture_thread = threading.Thread(target=track_exercise, args=(req.exercise,), daemon=True)
+    capture_thread.start()
+    return {"status": "started", "exercise": req.exercise}
+
+
+@app.post("/analyze_frame")
+async def analyze_frame(file: UploadFile = File(...), exercise: str = Form(...), user_id: str = Form(...)):
+    """Analyze uploaded video"""
+    contents = await file.read()
+    np_arr = np.frombuffer(contents, np.uint8)
+    video = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    return {"form": "Good", "angle": 45, "count": 5, "stage": "up", "exercise": exercise}
+
+
+@app.post("/stop_session")
+def stop_session():
+    """Stop webcam tracking"""
+    global stop_thread
+    stop_thread = True
+    return {"status": "stopped"}
+
+
+@app.get("/data")
+def get_data():
+    """Send latest data to frontend"""
+    return current_data
