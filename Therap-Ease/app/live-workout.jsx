@@ -1,21 +1,21 @@
+import { Ionicons } from "@expo/vector-icons";
+import { Camera, CameraView } from "expo-camera";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
+  Alert,
+  Linking,
+  Platform,
   StyleSheet,
   Text,
-  View,
   TouchableOpacity,
-  Linking,
-  Alert,
-  Platform,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Camera, CameraView } from "expo-camera";
-import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import Svg, { Circle, Line } from "react-native-svg";
 import { ColorTheme } from "../constants/GlobalStyles";
 
-const API_BASE = "http://192.168.1.9:8000";
+const API_BASE = "http://192.168.X.X:8000";
 
 const EXERCISE_JOINTS = {
   squat: [
