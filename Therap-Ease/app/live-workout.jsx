@@ -17,6 +17,11 @@ import { ColorTheme } from "../constants/GlobalStyles";
 
 const API_BASE = "http://192.168.1.9:8000";
 
+// how often we *actually* want to send frames (ms)
+const SAMPLE_INTERVAL = 300;
+// minimum time between counted reps (ms) to avoid double-beeps
+const MIN_REP_INTERVAL_MS = 700;
+
 const EXERCISE_JOINTS = {
   squat: [
     "left_hip",
@@ -138,8 +143,13 @@ function findKp(keypoints, name) {
   });
 }
 
-// Helper to mirror X for front camera (selfie view)
+// mirror X for front camera (selfie)
 const mapX = (x, isFront = true) => (isFront ? 1 - x : x);
+
+// placeholder: you can replace with expo-av beep
+const playRepBeep = () => {
+  console.log("REP!");
+};
 
 export default function LiveWorkoutScreen() {
   const router = useRouter();
@@ -174,6 +184,12 @@ export default function LiveWorkoutScreen() {
   const frameTimerRef = useRef(null);
   const isCapturingRef = useRef(false);
 
+  const lastCaptureTsRef = useRef(0);
+  const lastRepTsRef = useRef(0);
+
+  // 🔹 which side is currently “active”: "left" | "right" | null
+  const [activeSide, setActiveSide] = useState(null);
+
   useEffect(() => {
     if (Platform.OS === "web") {
       setHasPermission(true);
@@ -204,7 +220,7 @@ export default function LiveWorkoutScreen() {
 
     frameTimerRef.current = setInterval(() => {
       captureAndAnalyzeFrame();
-    }, 800);
+    }, 100);
 
     return () => {
       if (frameTimerRef.current) {
@@ -217,6 +233,13 @@ export default function LiveWorkoutScreen() {
   const captureAndAnalyzeFrame = async () => {
     if (!cameraRef.current) return;
     if (isCapturingRef.current) return;
+
+    const now = Date.now();
+    if (now - lastCaptureTsRef.current < SAMPLE_INTERVAL) {
+      return;
+    }
+    lastCaptureTsRef.current = now;
+
     isCapturingRef.current = true;
 
     try {
@@ -259,8 +282,10 @@ export default function LiveWorkoutScreen() {
   const updateFromPose = (pose) => {
     if (!running || sessionEnded || setCompleted || !pose) return;
 
-    let angles = [];
+    let avgAngle = null;
+    let sideForThisFrame = null; // "left" or "right" for symmetric ex.
 
+    // ---- 1) ANGLE COMPUTATION & ACTIVE SIDE PICK ----
     if (exerciseKey === "squat") {
       const leftHip = getKeypoint(pose, "left_hip");
       const leftKnee = getKeypoint(pose, "left_knee");
@@ -268,27 +293,107 @@ export default function LiveWorkoutScreen() {
       const rightHip = getKeypoint(pose, "right_hip");
       const rightKnee = getKeypoint(pose, "right_knee");
       const rightAnkle = getKeypoint(pose, "right_ankle");
+
+      let leftAngle = null;
+      let rightAngle = null;
+
       if (leftHip && leftKnee && leftAnkle) {
-        angles.push(calculateAngle(leftHip, leftKnee, leftAnkle));
+        leftAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
       }
       if (rightHip && rightKnee && rightAnkle) {
-        angles.push(calculateAngle(rightHip, rightKnee, rightAnkle));
+        rightAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
       }
-    } else if (
-      exerciseKey === "bicep_curl" ||
-      exerciseKey === "shoulder_abduction"
-    ) {
+
+      if (leftAngle == null && rightAngle == null) return;
+
+      if (leftAngle != null && rightAngle != null) {
+        // pick more bent leg (smaller knee angle)
+        if (leftAngle <= rightAngle) {
+          avgAngle = leftAngle;
+          sideForThisFrame = "left";
+        } else {
+          avgAngle = rightAngle;
+          sideForThisFrame = "right";
+        }
+      } else if (leftAngle != null) {
+        avgAngle = leftAngle;
+        sideForThisFrame = "left";
+      } else {
+        avgAngle = rightAngle;
+        sideForThisFrame = "right";
+      }
+    } else if (exerciseKey === "bicep_curl") {
       const leftShoulder = getKeypoint(pose, "left_shoulder");
       const leftElbow = getKeypoint(pose, "left_elbow");
       const leftWrist = getKeypoint(pose, "left_wrist");
       const rightShoulder = getKeypoint(pose, "right_shoulder");
       const rightElbow = getKeypoint(pose, "right_elbow");
       const rightWrist = getKeypoint(pose, "right_wrist");
+
+      let leftAngle = null;
+      let rightAngle = null;
+
       if (leftShoulder && leftElbow && leftWrist) {
-        angles.push(calculateAngle(leftShoulder, leftElbow, leftWrist));
+        leftAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
       }
       if (rightShoulder && rightElbow && rightWrist) {
-        angles.push(calculateAngle(rightShoulder, rightElbow, rightWrist));
+        rightAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+      }
+
+      if (leftAngle == null && rightAngle == null) return;
+
+      if (leftAngle != null && rightAngle != null) {
+        // pick more flexed arm (smaller angle)
+        if (leftAngle <= rightAngle) {
+          avgAngle = leftAngle;
+          sideForThisFrame = "left";
+        } else {
+          avgAngle = rightAngle;
+          sideForThisFrame = "right";
+        }
+      } else if (leftAngle != null) {
+        avgAngle = leftAngle;
+        sideForThisFrame = "left";
+      } else {
+        avgAngle = rightAngle;
+        sideForThisFrame = "right";
+      }
+    } else if (exerciseKey === "shoulder_abduction") {
+      const leftShoulder = getKeypoint(pose, "left_shoulder");
+      const leftElbow = getKeypoint(pose, "left_elbow");
+      const leftWrist = getKeypoint(pose, "left_wrist");
+      const rightShoulder = getKeypoint(pose, "right_shoulder");
+      const rightElbow = getKeypoint(pose, "right_elbow");
+      const rightWrist = getKeypoint(pose, "right_wrist");
+
+      let leftAngle = null;
+      let rightAngle = null;
+
+      if (leftShoulder && leftElbow && leftWrist) {
+        leftAngle = calculateAngle(leftShoulder, leftElbow, leftWrist);
+      }
+      if (rightShoulder && rightElbow && rightWrist) {
+        rightAngle = calculateAngle(rightShoulder, rightElbow, rightWrist);
+      }
+
+      if (leftAngle == null && rightAngle == null) return;
+
+      if (leftAngle != null && rightAngle != null) {
+        // here, arm that is raised more has *smaller* or *larger* angle
+        // but to stay consistent, still pick the one with smaller angle = more bent
+        if (leftAngle <= rightAngle) {
+          avgAngle = leftAngle;
+          sideForThisFrame = "left";
+        } else {
+          avgAngle = rightAngle;
+          sideForThisFrame = "right";
+        }
+      } else if (leftAngle != null) {
+        avgAngle = leftAngle;
+        sideForThisFrame = "left";
+      } else {
+        avgAngle = rightAngle;
+        sideForThisFrame = "right";
       }
     } else if (exerciseKey === "knee_extension" || exerciseKey === "leg_raise") {
       const leftHip = getKeypoint(pose, "left_hip");
@@ -297,30 +402,70 @@ export default function LiveWorkoutScreen() {
       const rightHip = getKeypoint(pose, "right_hip");
       const rightKnee = getKeypoint(pose, "right_knee");
       const rightAnkle = getKeypoint(pose, "right_ankle");
+
+      let leftAngle = null;
+      let rightAngle = null;
+
       if (leftHip && leftKnee && leftAnkle) {
-        angles.push(calculateAngle(leftHip, leftKnee, leftAnkle));
+        leftAngle = calculateAngle(leftHip, leftKnee, leftAnkle);
       }
       if (rightHip && rightKnee && rightAnkle) {
-        angles.push(calculateAngle(rightHip, rightKnee, rightAnkle));
+        rightAngle = calculateAngle(rightHip, rightKnee, rightAnkle);
+      }
+
+      if (leftAngle == null && rightAngle == null) return;
+
+      if (leftAngle != null && rightAngle != null) {
+        // pick more bent leg (smaller angle)
+        if (leftAngle <= rightAngle) {
+          avgAngle = leftAngle;
+          sideForThisFrame = "left";
+        } else {
+          avgAngle = rightAngle;
+          sideForThisFrame = "right";
+        }
+      } else if (leftAngle != null) {
+        avgAngle = leftAngle;
+        sideForThisFrame = "left";
+      } else {
+        avgAngle = rightAngle;
+        sideForThisFrame = "right";
       }
     } else if (exerciseKey === "side_bend") {
+      // still using both sides; no activeSide filtering
       const leftShoulder = getKeypoint(pose, "left_shoulder");
       const rightShoulder = getKeypoint(pose, "right_shoulder");
       const leftHip = getKeypoint(pose, "left_hip");
       const rightHip = getKeypoint(pose, "right_hip");
+
+      const angles = [];
       if (leftShoulder && leftHip && rightHip) {
         angles.push(calculateAngle(leftShoulder, leftHip, rightHip));
       }
       if (rightShoulder && rightHip && leftHip) {
         angles.push(calculateAngle(rightShoulder, rightHip, leftHip));
       }
+      if (!angles.length) return;
+      avgAngle = angles.reduce((s, a) => s + a, 0) / angles.length;
     }
 
-    if (!angles.length) return;
+    if (avgAngle == null) return;
 
-    const avgAngle = angles.reduce((sum, a) => sum + a, 0) / angles.length;
+    // update active side only for symmetric one-limb tracking
+    if (
+      sideForThisFrame &&
+      (exerciseKey === "bicep_curl" ||
+        exerciseKey === "shoulder_abduction" ||
+        exerciseKey === "squat" ||
+        exerciseKey === "knee_extension" ||
+        exerciseKey === "leg_raise")
+    ) {
+      setActiveSide(sideForThisFrame);
+    }
+
     setAngle(avgAngle);
 
+    // ---- 2) FORM LABEL ----
     if (exerciseKey === "bicep_curl") {
       if (avgAngle < 70) setFormLabel("Great contraction!");
       else if (avgAngle > 145) setFormLabel("Full extension!");
@@ -353,6 +498,7 @@ export default function LiveWorkoutScreen() {
       );
     }
 
+    // ---- 3) REP LOGIC + DEBOUNCE ----
     const downThresh = 98;
     const upThresh = 150;
 
@@ -388,18 +534,24 @@ export default function LiveWorkoutScreen() {
       }
 
       if (repHappened) {
-        setCount((prevCount) => {
-          const newCount = prevCount + 1;
-          setTotalRepsDone((prevTotal) => prevTotal + 1);
-          if (newCount >= repsTarget) {
-            setSetCompleted(true);
-            setRunning(false);
-            if (currentSet >= totalSets) {
-              setSessionEnded(true);
+        const now = Date.now();
+        if (now - lastRepTsRef.current >= MIN_REP_INTERVAL_MS) {
+          lastRepTsRef.current = now;
+          playRepBeep();
+
+          setCount((prevCount) => {
+            const newCount = prevCount + 1;
+            setTotalRepsDone((prevTotal) => prevTotal + 1);
+            if (newCount >= repsTarget) {
+              setSetCompleted(true);
+              setRunning(false);
+              if (currentSet >= totalSets) {
+                setSessionEnded(true);
+              }
             }
-          }
-          return newCount;
-        });
+            return newCount;
+          });
+        }
       }
 
       return newStage;
@@ -437,13 +589,13 @@ export default function LiveWorkoutScreen() {
     setRunning(true);
     setPdfUrl(null);
     setPoseKeypoints([]);
+    setActiveSide(null);
   };
 
   const handleBack = () => {
     router.back();
   };
 
-  // NEW: toggle camera front/back
   const handleToggleCamera = () => {
     setFacing((prev) => (prev === "front" ? "back" : "front"));
   };
@@ -522,10 +674,27 @@ export default function LiveWorkoutScreen() {
   const progress = Math.min(1, count / (repsTarget || 1));
   const progressPercent = Math.round(progress * 100);
 
-  const trackedJoints = EXERCISE_JOINTS[exerciseKey] || [];
-  const segments = EXERCISE_SEGMENTS[exerciseKey] || [];
-  const minScore = 0.4;
+  const allTrackedJoints = EXERCISE_JOINTS[exerciseKey] || [];
+  let trackedJoints = allTrackedJoints;
+  let segments = EXERCISE_SEGMENTS[exerciseKey] || [];
 
+  // 🔹 Only draw active side for symmetric limb exercises
+  if (
+    activeSide &&
+    (exerciseKey === "bicep_curl" ||
+      exerciseKey === "shoulder_abduction" ||
+      exerciseKey === "squat" ||
+      exerciseKey === "knee_extension" ||
+      exerciseKey === "leg_raise")
+  ) {
+    const prefix = activeSide + "_";
+    trackedJoints = allTrackedJoints.filter((j) => j.startsWith(prefix));
+    segments = segments.filter(
+      ([a, b]) => a.startsWith(prefix) && b.startsWith(prefix)
+    );
+  }
+
+  const minScore = 0.4;
   const isFrontCamera = Platform.OS !== "web" && facing === "front";
 
   return (
@@ -580,7 +749,6 @@ export default function LiveWorkoutScreen() {
           />
         )}
 
-        {/* Camera toggle button */}
         {Platform.OS !== "web" && (
           <TouchableOpacity
             style={styles.cameraSwitchBtn}
@@ -860,7 +1028,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
   },
   camera: { flex: 1 },
-  // NEW: camera switch button
   cameraSwitchBtn: {
     position: "absolute",
     top: 10,

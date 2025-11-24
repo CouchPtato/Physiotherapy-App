@@ -32,9 +32,11 @@ app.mount("/reports", StaticFiles(directory=REPORT_DIR), name="reports")
 app.mount("/videos", StaticFiles(directory=VIDEO_DIR), name="videos")
 
 mp_pose = mp.solutions.pose
+
+# Global pose detector for LIVE frames (fast config)
 pose_detector = mp_pose.Pose(
-    static_image_mode=False,           # better for continuous frames
-    model_complexity=1,
+    static_image_mode=False,           # better for live
+    model_complexity=0,                # fastest model
     enable_segmentation=False,
     min_detection_confidence=0.5,
     min_tracking_confidence=0.5,
@@ -73,6 +75,52 @@ EXERCISES = {
         "RIGHT_ANKLE",
     ],
     "side_bend": ["LEFT_SHOULDER", "RIGHT_SHOULDER", "LEFT_HIP", "RIGHT_HIP"],
+}
+
+# Optional: limit keypoints returned per exercise (for live)
+NEEDED_KEYS = {
+    "bicep_curl": [
+        "left_elbow",
+        "right_elbow",
+        "left_shoulder",
+        "right_shoulder",
+        "left_wrist",
+        "right_wrist",
+    ],
+    "squat": [
+        "left_hip",
+        "right_hip",
+        "left_knee",
+        "right_knee",
+        "left_ankle",
+        "right_ankle",
+    ],
+    "shoulder_abduction": [
+        "left_shoulder",
+        "right_shoulder",
+        "left_elbow",
+        "right_elbow",
+    ],
+    "knee_extension": [
+        "left_hip",
+        "right_hip",
+        "left_knee",
+        "right_knee",
+    ],
+    "leg_raise": [
+        "left_hip",
+        "right_hip",
+        "left_knee",
+        "right_knee",
+        "left_ankle",
+        "right_ankle",
+    ],
+    "side_bend": [
+        "left_shoulder",
+        "right_shoulder",
+        "left_hip",
+        "right_hip",
+    ],
 }
 
 
@@ -421,9 +469,11 @@ async def analyze_video(
 
     involved_names = EXERCISES.get(exercise_key, [])
 
+    # For offline video analysis we can afford a bit higher complexity
     with mp_pose.Pose(
         min_detection_confidence=0.6,
         min_tracking_confidence=0.6,
+        model_complexity=1,
     ) as pose:
         while True:
             ret, frame = cap.read()
@@ -564,6 +614,7 @@ class FrameRequest(BaseModel):
     image_base64: str
     exercise_key: str | None = None
 
+
 @app.post("/analyze_frame")
 async def analyze_frame(req: FrameRequest):
     try:
@@ -576,9 +627,9 @@ async def analyze_frame(req: FrameRequest):
             print("Failed to decode frame in analyze_frame")
             raise HTTPException(status_code=400, detail="Invalid image data")
 
-        # 🔹 downscale large frames to speed up pose
+        # downscale more aggressively to speed up pose
         h, w = frame.shape[:2]
-        max_side = 480
+        max_side = 320   # was 480
         scale = max_side / max(h, w)
         if scale < 1.0:
             frame = cv2.resize(
@@ -594,13 +645,22 @@ async def analyze_frame(req: FrameRequest):
             print("No pose detected in analyze_frame")
             return {"pose": {"keypoints": []}}
 
+        wanted = None
+        if req.exercise_key:
+            wanted = NEEDED_KEYS.get(req.exercise_key, None)
+
         keypoints = []
         for idx, lm in enumerate(results.pose_landmarks.landmark):
-            name = mp_pose.PoseLandmark(idx).name.lower()
+            name = mp_pose.PoseLandmark(idx).name.lower()  # e.g. 'left_knee'
+
+            # If we have a list of needed keys, skip others
+            if wanted and name not in wanted:
+                continue
+
             keypoints.append(
                 {
                     "name": name,
-                    "x": float(lm.x),          # still normalized 0–1
+                    "x": float(lm.x),          # normalized 0–1
                     "y": float(lm.y),
                     "score": float(lm.visibility),
                 }
