@@ -1,4 +1,5 @@
 import * as Linking from 'expo-linking';
+import { useRouter } from "expo-router";
 import React from "react";
 import {
   FlatList,
@@ -10,7 +11,6 @@ import {
   View
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";              // ✅ use expo-router instead
 import img1 from '../../assets/images/banner1.png';
 import img2 from '../../assets/images/banner2.png';
 import { ColorTheme } from "../../constants/GlobalStyles.jsx";

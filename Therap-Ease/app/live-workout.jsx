@@ -15,7 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import Svg, { Circle, Line } from "react-native-svg";
 import { ColorTheme } from "../constants/GlobalStyles";
 
-const API_BASE = "http://192.168.X.X:8000";
+const API_BASE = "http://192.168.1.9:8000";
 
 const EXERCISE_JOINTS = {
   squat: [
@@ -156,7 +156,6 @@ export default function LiveWorkoutScreen() {
   const [hasPermission, setHasPermission] = useState(null);
   const cameraRef = useRef(null);
 
-  // NEW: camera facing state
   const [facing, setFacing] = useState("front"); // "front" | "back"
 
   const [angle, setAngle] = useState(0);

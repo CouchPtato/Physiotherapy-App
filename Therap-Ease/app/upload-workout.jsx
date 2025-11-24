@@ -1,19 +1,20 @@
+import { Ionicons } from "@expo/vector-icons";
+import { Video } from "expo-av";
+import * as DocumentPicker from "expo-document-picker";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  StyleSheet,
-  Text,
-  View,
-  TouchableOpacity,
+  ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   ScrollView,
-  Linking,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
-import * as DocumentPicker from "expo-document-picker";
-import { Video } from "expo-av";
 import { ColorTheme } from "../constants/GlobalStyles";
 
 const API_BASE = "http://192.168.1.9:8000";
@@ -34,6 +35,7 @@ export default function UploadWorkoutScreen() {
   const [processedVideoUri, setProcessedVideoUri] = useState(null);
   const [analysisData, setAnalysisData] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const handleBack = () => {
     router.back();
@@ -66,16 +68,26 @@ export default function UploadWorkoutScreen() {
     }
 
     try {
+      setIsAnalyzing(true);
+
       const fileUri = selectedVideo.uri;
       const fileName = selectedVideo.name || "exercise.mp4";
 
       const formData = new FormData();
-      formData.append("file", {
-        uri: fileUri,
-        name: fileName,
-        type: "video/mp4",
-      });
-      formData.append("exercise_key", exerciseKey);
+
+      if (Platform.OS === "web") {
+        const response = await fetch(fileUri);
+        const blob = await response.blob();
+        formData.append("file", blob, fileName);
+      } else {
+        formData.append("file", {
+          uri: fileUri,
+          name: fileName,
+          type: "video/mp4",
+        });
+      }
+
+      formData.append("exercise_key", String(exerciseKey));
       formData.append("patient_name", patientName || "Somay Singh");
       formData.append("patient_id", patientId || "P-2025-001");
       formData.append("assigned_reps", String(repsTarget));
@@ -87,6 +99,8 @@ export default function UploadWorkoutScreen() {
       });
 
       if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.log("Analyze error response:", errText);
         Alert.alert("Error", "Failed to analyze the uploaded video.");
         return;
       }
@@ -96,15 +110,12 @@ export default function UploadWorkoutScreen() {
       if (data.processed_video_url) {
         setProcessedVideoUri(`${API_BASE}${data.processed_video_url}`);
       }
-      Alert.alert(
-        "Analysis Complete",
-        `Reps detected: ${data.reps ?? "N/A"}`
-      );
+      Alert.alert("Analysis Complete", `Reps detected: ${data.reps ?? "N/A"}`);
     } catch (err) {
-      Alert.alert(
-        "Error",
-        "Something went wrong while analyzing the video."
-      );
+      console.log("Analyze error:", err);
+      Alert.alert("Error", "Something went wrong while analyzing the video.");
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -142,6 +153,8 @@ export default function UploadWorkoutScreen() {
       });
 
       if (!res.ok) {
+        const errText = await res.text().catch(() => "");
+        console.log("Generate PDF error:", errText);
         Alert.alert("Error", "Failed to generate PDF report.");
         return;
       }
@@ -151,6 +164,7 @@ export default function UploadWorkoutScreen() {
       setPdfUrl(fullUrl);
       Alert.alert("Report Ready", "Tap 'Open PDF' to view or download.");
     } catch (e) {
+      console.log("Generate PDF error:", e);
       Alert.alert("Error", "Something went wrong while generating the report.");
     }
   };
@@ -171,11 +185,7 @@ export default function UploadWorkoutScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
-          <Ionicons
-            name="chevron-back"
-            size={22}
-            color={ColorTheme.fourth}
-          />
+          <Ionicons name="chevron-back" size={22} color={ColorTheme.fourth} />
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>{name}</Text>
@@ -215,11 +225,7 @@ export default function UploadWorkoutScreen() {
             />
           ) : (
             <View style={styles.videoPlaceholder}>
-              <Ionicons
-                name="videocam-outline"
-                size={40}
-                color="#9ca3af"
-              />
+              <Ionicons name="videocam-outline" size={40} color="#9ca3af" />
               <Text style={styles.videoPlaceholderText}>
                 Choose a video and tap "Analyze Video" to see tracking.
               </Text>
@@ -227,10 +233,19 @@ export default function UploadWorkoutScreen() {
           )}
         </View>
 
+        {/* Loading row under video when analyzing */}
+        {isAnalyzing && (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color={ColorTheme.fourth} />
+            <Text style={styles.loadingText}>Analyzing video, please wait…</Text>
+          </View>
+        )}
+
         <View style={{ marginTop: 14 }}>
           <TouchableOpacity
             style={[styles.mainBtn, styles.secondaryBtn, { marginBottom: 8 }]}
             onPress={handleChooseVideo}
+            disabled={isAnalyzing}
           >
             <Ionicons
               name="cloud-upload-outline"
@@ -238,16 +253,19 @@ export default function UploadWorkoutScreen() {
               color={ColorTheme.fourth}
               style={{ marginRight: 6 }}
             />
-            <Text
-              style={[styles.mainBtnText, { color: ColorTheme.fourth }]}
-            >
+            <Text style={[styles.mainBtnText, { color: ColorTheme.fourth }]}>
               Choose Video
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.mainBtn, styles.primaryBtn, { marginBottom: 8 }]}
-            onPress={handleAnalyze}
+            style={[
+              styles.mainBtn,
+              styles.primaryBtn,
+              { marginBottom: 8, opacity: isAnalyzing ? 0.6 : 1 },
+            ]}
+            onPress={isAnalyzing ? undefined : handleAnalyze}
+            disabled={isAnalyzing}
           >
             <Ionicons
               name="fitness-outline"
@@ -255,10 +273,8 @@ export default function UploadWorkoutScreen() {
               color={ColorTheme.first}
               style={{ marginRight: 6 }}
             />
-            <Text
-              style={[styles.mainBtnText, { color: ColorTheme.first }]}
-            >
-              Analyze Video
+            <Text style={[styles.mainBtnText, { color: ColorTheme.first }]}>
+              {isAnalyzing ? "Analyzing..." : "Analyze Video"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -276,7 +292,9 @@ export default function UploadWorkoutScreen() {
           <View style={styles.statsRow}>
             <Text style={styles.statsLabel}>Form Score</Text>
             <Text style={styles.statsValue}>
-              {formScore > 1 ? formScore.toFixed(1) : (formScore * 100).toFixed(1)}
+              {formScore > 1
+                ? formScore.toFixed(1)
+                : (formScore * 100).toFixed(1)}
               /100
             </Text>
           </View>
@@ -287,6 +305,7 @@ export default function UploadWorkoutScreen() {
           <TouchableOpacity
             style={[styles.mainBtn, styles.primaryBtn, { marginTop: 8 }]}
             onPress={handleGeneratePdf}
+            disabled={isAnalyzing}
           >
             <Ionicons
               name="document-text-outline"
@@ -294,9 +313,7 @@ export default function UploadWorkoutScreen() {
               color={ColorTheme.first}
               style={{ marginRight: 6 }}
             />
-            <Text
-              style={[styles.mainBtnText, { color: ColorTheme.first }]}
-            >
+            <Text style={[styles.mainBtnText, { color: ColorTheme.first }]}>
               Generate PDF
             </Text>
           </TouchableOpacity>
@@ -312,12 +329,7 @@ export default function UploadWorkoutScreen() {
                 color={ColorTheme.first}
                 style={{ marginRight: 6 }}
               />
-              <Text
-                style={[
-                  styles.mainBtnText,
-                  { color: ColorTheme.first },
-                ]}
-              >
+              <Text style={[styles.mainBtnText, { color: ColorTheme.first }]}>
                 Open PDF
               </Text>
             </TouchableOpacity>
@@ -410,5 +422,17 @@ const styles = StyleSheet.create({
   pdfSection: {
     marginTop: 16,
     marginBottom: 10,
+  },
+  
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    paddingHorizontal: 4,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 12,
+    color: "#6095ffff",
   },
 });
