@@ -1,5 +1,7 @@
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React from "react";
 import {
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,8 +10,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import { ColorTheme } from "../../constants/GlobalStyles";
+
+//tutorial URL (replace with your real links)
+const EXERCISE_TUTORIALS = {
+  squat: "https://www.youtube.com/watch?v=aclHkVaku9U",
+  bicep_curl: "https://www.youtube.com/watch?v=ykJmrZ5v0Oo",
+  shoulder_abduction: "https://www.youtube.com/watch?v=pYcpY20QaE8",
+  knee_extension: "https://www.youtube.com/watch?v=lG4T6b4QFh0",
+  leg_raise: "https://www.youtube.com/watch?v=JB2oyawG9KI",
+  side_bend: "https://www.youtube.com/watch?v=CSLgrxQqSxY",
+};
 
 const ExerciseScreen = (props) => {
   const router = useRouter();
@@ -28,6 +39,9 @@ const ExerciseScreen = (props) => {
 
   const patientName = params.patientName || props.patientName || null;
   const patientId = params.patientId || props.patientId || null;
+
+  // Pick tutorial URL based on exerciseKey
+  const tutorialUrl = EXERCISE_TUTORIALS[exerciseKey];
 
   const handleStartLive = () => {
     router.push({
@@ -62,6 +76,18 @@ const ExerciseScreen = (props) => {
       },
     });
   };
+
+  // Open tutorial link (if available)
+  const handleWatchTutorial = () => {
+    if (!tutorialUrl) {
+      return;
+    }
+    Linking.openURL(tutorialUrl).catch(() => {
+      // optionally show an alert if open fails
+    });
+  };
+
+  const tutorialAvailable = !!tutorialUrl;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -183,13 +209,24 @@ const ExerciseScreen = (props) => {
           <Text style={styles.helpTitle}>Need Help?</Text>
           <Text style={styles.helpSubtitle}>Watch and learn!</Text>
 
-          <TouchableOpacity style={styles.helpButton}>
+          <TouchableOpacity
+            style={[
+              styles.helpButton,
+              !tutorialAvailable && { opacity: 0.4 },
+            ]}
+            onPress={tutorialAvailable ? handleWatchTutorial : undefined}
+            disabled={!tutorialAvailable}
+          >
             <Ionicons
               name="play-circle-outline"
               size={20}
               color={ColorTheme.first}
             />
-            <Text style={styles.helpButtonText}>Watch Exercise Tutorial</Text>
+            <Text style={styles.helpButtonText}>
+              {tutorialAvailable
+                ? "Watch Exercise Tutorial"
+                : "Tutorial coming soon"}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
