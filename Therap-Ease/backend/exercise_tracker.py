@@ -247,39 +247,227 @@ async def analyze_video(
 # ============================================================
 # PDF REPORT
 # ============================================================
+def generate_ai_physio_review(form_score, avg_time, reps, assigned_reps):
+    remarks = []
+
+    # Technique
+    if form_score >= 85:
+        remarks.append(
+            "The patient demonstrated excellent movement quality with consistent joint alignment."
+        )
+    elif form_score >= 70:
+        remarks.append(
+            "Overall technique was good, though minor deviations were observed during certain repetitions."
+        )
+    else:
+        remarks.append(
+            "Movement quality was inconsistent, indicating the need for corrective supervision."
+        )
+
+    # Speed
+    if avg_time < 3:
+        remarks.append(
+            "Repetitions were performed in a slow and controlled manner, appropriate for rehabilitation."
+        )
+    elif avg_time < 7:
+        remarks.append(
+            "Movement tempo was appropriate and well controlled."
+        )
+    else:
+        remarks.append(
+            "Repetitions were performed at a faster pace; controlled tempo is recommended."
+        )
+
+    # Volume
+    if reps >= assigned_reps:
+        remarks.append(
+            "The prescribed exercise volume was successfully completed."
+        )
+    else:
+        remarks.append(
+            "The patient was unable to complete the prescribed volume, possibly due to fatigue."
+        )
+
+    remarks.append(
+        "Continued focus on pain-free range of motion and gradual progression is advised."
+    )
+
+    return " ".join(remarks)
+
+def calculate_form_score(exercise, angle):
+    ideal_ranges = {
+        "bicep_curl": (30, 160),
+        "squat": (70, 160),
+        "shoulder_abduction": (70, 160),
+        "knee_extension": (0, 160),
+        "leg_raise": (40, 150),
+        "side_bend": (10, 35),
+    }
+
+    low, high = ideal_ranges.get(exercise, (60, 150))
+
+    if angle < low:
+        diff = low - angle
+    elif angle > high:
+        diff = angle - high
+    else:
+        diff = 0
+
+    score = max(0.0, 1.0 - diff / 60)
+    return score * 100
 
 @app.post("/generate_report")
 async def generate_report(request: Request):
-    data = await request.json()
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    patient_name = data.get("patient_name", "Unknown")
+    # ---------------- INPUT ----------------
+    patient_name = data.get("patient_name", "Unknown Patient")
     patient_id = data.get("patient_id", "N/A")
     exercise = data.get("exercise", "Exercise")
-    reps = int(data.get("reps", 0))
-    duration = float(data.get("duration", 0))
-    avg_time = float(data.get("avg_time", 0))
-    form_score = float(data.get("form_score", 0)) * 100
 
+    reps = int(data.get("reps", 0) or 0)
+    sets = int(data.get("sets", 1) or 1)
+    assigned_reps = int(data.get("assigned_reps", 0) or 0)
+    duration = float(data.get("duration", 0.0) or 0.0)
+    avg_time = float(data.get("avg_time", 0.0) or 0.0)
+
+    form_score = float(data.get("form_score", 0.0) or 0.0)
+    if form_score <= 1.0:
+        form_score *= 100.0
+
+    medical_history = data.get(
+        "medical_history",
+        "History of hip replacement surgery. Currently undergoing physiotherapy "
+        "for post-surgical strength, mobility, and functional recovery."
+    )
+
+    primary_goal = data.get(
+        "goal",
+        "Improve strength, balance, and range of motion."
+    )
+
+    date_str = datetime.now().strftime("%d %B %Y")
+
+    # ---------------- HELPERS ----------------
+    def make_bar(value, target, length=18):
+        if target <= 0:
+            return "[" + "-" * length + "]"
+        ratio = max(0.0, min(1.0, value / target))
+        filled = int(ratio * length)
+        return "[" + "#" * filled + "-" * (length - filled) + "]"
+
+    # ---------------- INTERPRETATION ----------------
+    if reps < 5:
+        reps_interp = "Low volume session"
+    elif reps < 15:
+        reps_interp = "Moderate volume session"
+    else:
+        reps_interp = "High volume session"
+
+    if duration < 20:
+        duration_interp = "Short session"
+    elif duration < 60:
+        duration_interp = "Typical session duration"
+    else:
+        duration_interp = "Extended session"
+
+    if avg_time < 3:
+        speed_interp = "Slow and controlled"
+    elif avg_time < 7:
+        speed_interp = "Moderate tempo"
+    else:
+        speed_interp = "Fast-paced reps"
+
+    if form_score >= 85:
+        form_interp = "Excellent technique"
+    elif form_score >= 70:
+        form_interp = "Good technique"
+    else:
+        form_interp = "Technique needs improvement"
+
+    # ---------------- PDF ----------------
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+
+    # PAGE 1
     pdf.add_page()
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "TherapEase Physiotherapy Report", ln=1, align="C")
+    pdf.cell(0, 10, "Physiotherapy Exercise Session Report - TherapEase", ln=1, align="C")
 
-    pdf.set_font("Helvetica", "", 12)
-    pdf.cell(0, 8, f"Patient: {patient_name}", ln=1)
-    pdf.cell(0, 8, f"Patient ID: {patient_id}", ln=1)
-    pdf.cell(0, 8, f"Exercise: {exercise}", ln=1)
-    pdf.cell(0, 8, f"Reps: {reps}", ln=1)
-    pdf.cell(0, 8, f"Duration: {duration:.1f} sec", ln=1)
-    pdf.cell(0, 8, f"Avg Time / Rep: {avg_time:.2f}", ln=1)
-    pdf.cell(0, 8, f"Form Score: {form_score:.1f}%", ln=1)
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Patient Details", ln=1)
 
-    name = f"report_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
-    path = os.path.join(REPORT_DIR, name)
-    pdf.output(path)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 6, f"Name: {patient_name}", ln=1)
+    pdf.cell(0, 6, f"Patient ID: {patient_id}", ln=1)
+    pdf.cell(0, 6, f"Date of Report: {date_str}", ln=1)
 
-    return {"url": f"/reports/{name}"}
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Medical History", ln=1)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.multi_cell(0, 5, medical_history)
 
+    pdf.ln(4)
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Current Prescription", ln=1)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.multi_cell(0, 5, primary_goal)
+
+    # PAGE 2
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Session Summary", ln=1)
+
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(60, 7, "Metric", border=1)
+    pdf.cell(60, 7, "Result", border=1)
+    pdf.cell(70, 7, "Interpretation", border=1, ln=1)
+
+    pdf.set_font("Helvetica", "", 10)
+    pdf.cell(60, 7, "Exercise", border=1)
+    pdf.cell(60, 7, exercise, border=1)
+    pdf.cell(70, 7, "Primary movement", border=1, ln=1)
+
+    pdf.cell(60, 7, "Repetitions", border=1)
+    pdf.cell(60, 7, f"{reps} / {assigned_reps}", border=1)
+    pdf.cell(70, 7, reps_interp, border=1, ln=1)
+
+    pdf.cell(60, 7, "Session Duration", border=1)
+    pdf.cell(60, 7, f"{duration:.1f} sec", border=1)
+    pdf.cell(70, 7, duration_interp, border=1, ln=1)
+
+    pdf.cell(60, 7, "Average Speed", border=1)
+    pdf.cell(60, 7, f"{avg_time:.2f}", border=1)
+    pdf.cell(70, 7, speed_interp, border=1, ln=1)
+
+    pdf.cell(60, 7, "Form Score", border=1)
+    pdf.cell(60, 7, f"{form_score:.1f} / 100", border=1)
+    pdf.cell(70, 7, form_interp, border=1, ln=1)
+
+    # PAGE 3
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Therapist Remarks", ln=1)
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.multi_cell(
+        0,
+        5,
+        "Patient tolerated the session well. Continued focus on controlled, "
+        "pain-free movement and proper alignment is advised."
+    )
+
+    # SAVE
+    filename = f"report_{patient_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filepath = os.path.join(REPORT_DIR, filename)
+    pdf.output(filepath)
+
+    return { "url": f"/reports/{filename}" }
 
 @app.get("/reports/{filename}")
 def get_report(filename: str):

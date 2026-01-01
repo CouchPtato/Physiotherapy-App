@@ -1,20 +1,16 @@
 import { CameraView } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import {
-  Text,
-  View,
-  TouchableOpacity,
-  Linking,
-} from "react-native";
+import { Text, View, TouchableOpacity, Linking } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
 import { usePoseStore } from "../hooks/use-pose-store";
 import { PoseSkiaOverlay } from "../components/pose/PoseSkiaOverlay";
 
-const API_BASE = "http://192.168.1.8:8000";
+const API_BASE = "http://192.168.x.x:8000";
 const FRAME_INTERVAL = 300;
+const MOTION_TIMEOUT_MS = 800; // how long pose keeps motion "alive"
 
 export default function LiveWorkoutScreen() {
   const router = useRouter();
@@ -28,7 +24,8 @@ export default function LiveWorkoutScreen() {
   const patientId = params.patientId || "P-2025-001";
 
   const cameraRef = useRef(null);
-  const frameTimer = useRef(null);
+  const frameTimerRef = useRef(null);
+  const stoppedRef = useRef(false);
 
   /* ---------------- UI STATE ---------------- */
 
@@ -46,6 +43,16 @@ export default function LiveWorkoutScreen() {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
+  /* ---------------- MOTION STATE ---------------- */
+
+  const lastPoseTsRef = useRef(0);
+  const [motionUI, setMotionUI] = useState(false);
+
+  /* ---------------- FORM SCORE ---------------- */
+
+  const totalFormScoreRef = useRef(0);
+  const formFrameCountRef = useRef(0);
+
   /* ---------------- REP CALLBACK ---------------- */
 
   const onRep = () => {
@@ -56,7 +63,6 @@ export default function LiveWorkoutScreen() {
       if (next >= repsTarget) {
         setRunning(false);
         setSetCompleted(true);
-
         if (currentSet >= totalSets) {
           setWorkoutEnded(true);
         }
@@ -67,10 +73,14 @@ export default function LiveWorkoutScreen() {
 
   /* ---------------- POSE ENGINE ---------------- */
 
-  const { processFrame, angleSV, keypointsSV } =
-    usePoseStore(exerciseKey, onRep);
+  const {
+    processFrame,
+    angleSV,
+    keypointsSV,
+    lastFormScoreRef,
+  } = usePoseStore(exerciseKey, onRep);
 
-  /* ---------------- ANGLE UI (THROTTLED) ---------------- */
+  /* ---------------- ANGLE UI ---------------- */
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -79,27 +89,31 @@ export default function LiveWorkoutScreen() {
     return () => clearInterval(id);
   }, []);
 
-  /* ---------------- ELAPSED TIME ---------------- */
+  /* ---------------- TIMER ---------------- */
 
   useEffect(() => {
     if (!running) return;
-    const id = setInterval(() => {
-      setElapsed((t) => t + 1);
-    }, 1000);
+    const id = setInterval(() => setElapsed((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [running]);
 
-  /* ---------------- FRAME CAPTURE ---------------- */
+  /* ---------------- FRAME LOOP ---------------- */
 
   const captureFrame = async () => {
-    if (!cameraRef.current || !running) return;
+    if (
+      !cameraRef.current ||
+      !running ||
+      stoppedRef.current
+    ) {
+      return;
+    }
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
         quality: 0.25,
         skipProcessing: true,
-        mute: true, // 🔇 reduce shutter sound
+        mute: true,
       });
 
       const res = await fetch(`${API_BASE}/analyze_frame`, {
@@ -112,27 +126,63 @@ export default function LiveWorkoutScreen() {
       });
 
       const data = await res.json();
-      processFrame(data.pose || { keypoints: [] });
+      const keypoints = data.pose?.keypoints || [];
+
+      // ✅ MOTION = POSE PRESENT
+      if (keypoints.length > 0) {
+        lastPoseTsRef.current = Date.now();
+        setMotionUI(true);
+        processFrame({ keypoints });
+
+        if (lastFormScoreRef.current != null) {
+          totalFormScoreRef.current += lastFormScoreRef.current;
+          formFrameCountRef.current += 1;
+        }
+      } else {
+        // Check timeout
+        if (
+          Date.now() - lastPoseTsRef.current > MOTION_TIMEOUT_MS
+        ) {
+          setMotionUI(false);
+        }
+      }
     } catch {
       // ignore dropped frames
     }
   };
 
   useEffect(() => {
-    if (!running) return;
-    frameTimer.current = setInterval(captureFrame, FRAME_INTERVAL);
-    return () => clearInterval(frameTimer.current);
-  }, [running]);
+    if (!running || workoutEnded) return;
+
+    frameTimerRef.current = setInterval(
+      captureFrame,
+      FRAME_INTERVAL
+    );
+
+    return () => {
+      clearInterval(frameTimerRef.current);
+      frameTimerRef.current = null;
+    };
+  }, [running, workoutEnded]);
 
   /* ---------------- ACTIONS ---------------- */
 
   const toggleCamera = () =>
     setFacing((f) => (f === "front" ? "back" : "front"));
 
+  const hardStopCamera = () => {
+    stoppedRef.current = true;
+    if (frameTimerRef.current) {
+      clearInterval(frameTimerRef.current);
+      frameTimerRef.current = null;
+    }
+  };
+
   const endWorkout = () => {
+    hardStopCamera();
     setRunning(false);
-    setSetCompleted(false);
     setWorkoutEnded(true);
+    setSetCompleted(false);
   };
 
   const startNextSet = () => {
@@ -140,11 +190,18 @@ export default function LiveWorkoutScreen() {
     setRepsThisSet(0);
     setSetCompleted(false);
     setRunning(true);
+    stoppedRef.current = false;
   };
 
   const generatePdf = async () => {
     if (generatingPdf) return;
     setGeneratingPdf(true);
+
+    const avgFormScore =
+      formFrameCountRef.current > 0
+        ? totalFormScoreRef.current /
+          formFrameCountRef.current
+        : 0;
 
     try {
       const payload = {
@@ -157,14 +214,17 @@ export default function LiveWorkoutScreen() {
         sets: totalSets,
         duration: elapsed,
         avg_time: totalReps ? elapsed / totalReps : 0,
-        form_score: 0.85,
+        form_score: avgFormScore,
       };
 
-      const res = await fetch(`${API_BASE}/generate_report`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${API_BASE}/generate_report`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.json();
       setPdfUrl(`${API_BASE}${data.url}`);
@@ -174,6 +234,7 @@ export default function LiveWorkoutScreen() {
   };
 
   const repeatWorkout = () => {
+    stoppedRef.current = false;
     setCurrentSet(1);
     setRepsThisSet(0);
     setTotalReps(0);
@@ -182,10 +243,15 @@ export default function LiveWorkoutScreen() {
     setWorkoutEnded(false);
     setSetCompleted(false);
     setPdfUrl(null);
+    setMotionUI(false);
+
+    totalFormScoreRef.current = 0;
+    formFrameCountRef.current = 0;
+    lastPoseTsRef.current = 0;
   };
 
   const goBack = () => {
-    setRunning(false);
+    hardStopCamera();
     router.back();
   };
 
@@ -193,104 +259,101 @@ export default function LiveWorkoutScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
-      <CameraView
-        ref={cameraRef}
-        style={{ flex: 1 }}
-        facing={facing}
-      />
+      {!workoutEnded && (
+        <CameraView
+          ref={cameraRef}
+          style={{ flex: 1 }}
+          facing={facing}
+        />
+      )}
 
       <PoseSkiaOverlay keypointsSV={keypointsSV} />
 
-      {/* Back button */}
-      <TouchableOpacity
-        onPress={goBack}
-        style={btnStyle("rgba(0,0,0,0.6)", { left: 20 })}
-      >
+      <TouchableOpacity onPress={goBack} style={btn({ left: 20 })}>
         <Ionicons name="chevron-back" size={22} color="#fff" />
       </TouchableOpacity>
 
-      {/* Camera toggle */}
-      <TouchableOpacity
-        onPress={toggleCamera}
-        style={btnStyle("rgba(0,0,0,0.6)", { right: 20 })}
-      >
+      <TouchableOpacity onPress={toggleCamera} style={btn({ right: 20 })}>
         <Ionicons name="camera-reverse" size={22} color="#fff" />
       </TouchableOpacity>
 
-      {/* End workout anytime */}
       {!workoutEnded && (
-        <TouchableOpacity
-          onPress={endWorkout}
-          style={{
-            position: "absolute",
-            top: 40,
-            alignSelf: "center",
-            backgroundColor: "#fecaca",
-            padding: 15,
-            borderRadius: 20,
-          }}
-        >
+        <TouchableOpacity onPress={endWorkout} style={endBtn}>
           <Text style={{ fontWeight: "700" }}>End</Text>
         </TouchableOpacity>
       )}
 
-      {/* Stats */}
       <View style={{ position: "absolute", bottom: 40, left: 20 }}>
-        <Text style={text(20)}>Set {currentSet}/{totalSets}</Text>
-        <Text style={text(18)}>Reps: {repsThisSet}/{repsTarget}</Text>
-        <Text style={text(16)}>Angle: {angleUI}°</Text>
-        <Text style={{ color: "#9ca3af" }}>Time: {elapsed}s</Text>
+        <Text style={txt(20)}>
+          Set {currentSet}/{totalSets}
+        </Text>
+        <Text style={txt(18)}>
+          Reps: {repsThisSet}/{repsTarget}
+        </Text>
+        <Text style={txt(16)}>
+          Angle: {angleUI}°
+        </Text>
+        <Text style={{ color: "#9ca3af" }}>
+          Time: {elapsed}s
+        </Text>
+        <Text
+          style={{
+            color: motionUI ? "#22c55e" : "#9ca3af",
+          }}
+        >
+          {motionUI ? "Motion detected" : "Idle"}
+        </Text>
       </View>
 
-      {/* Set completed */}
-      {setCompleted && !workoutEnded && (
-        <Overlay>
-          <Title>Set {currentSet} completed</Title>
-          <Primary text="Start Next Set" onPress={startNextSet} />
-          <Secondary text="End Workout" onPress={endWorkout} />
-        </Overlay>
-      )}
-
-      {/* Workout ended */}
       {workoutEnded && (
         <Overlay>
           <Title>Workout completed</Title>
-          <Text style={{ color: "#9ca3af", marginBottom: 10 }}>
-            Total reps: {totalReps}
-          </Text>
-
           {!pdfUrl && (
             <Primary
-              text={generatingPdf ? "Generating..." : "Generate Report"}
+              text={
+                generatingPdf
+                  ? "Generating..."
+                  : "Generate Report"
+              }
               onPress={generatePdf}
             />
           )}
-
           {pdfUrl && (
             <Primary
               text="Open PDF Report"
               onPress={() => Linking.openURL(pdfUrl)}
             />
           )}
-
-          <Secondary text="Repeat Workout" onPress={repeatWorkout} />
+          <Secondary
+            text="Repeat Workout"
+            onPress={repeatWorkout}
+          />
         </Overlay>
       )}
     </SafeAreaView>
   );
 }
 
-/* ---------------- REUSABLE UI ---------------- */
+/* ---------------- UI HELPERS ---------------- */
 
-const btnStyle = (bg, pos) => ({
+const btn = (pos) => ({
   position: "absolute",
   top: 20,
   padding: 10,
   borderRadius: 20,
-  backgroundColor: bg,
+  backgroundColor: "rgba(0,0,0,0.6)",
   zIndex: 50,
   ...pos,
 });
+
+const endBtn = {
+  position: "absolute",
+  top: 40,
+  alignSelf: "center",
+  backgroundColor: "#fecaca",
+  padding: 15,
+  borderRadius: 20,
+};
 
 const Overlay = ({ children }) => (
   <View
@@ -339,12 +402,18 @@ const Secondary = ({ text, onPress }) => (
 );
 
 const Title = ({ children }) => (
-  <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8 }}>
+  <Text
+    style={{
+      color: "#fff",
+      fontSize: 18,
+      marginBottom: 8,
+    }}
+  >
     {children}
   </Text>
 );
 
-const text = (size) => ({
+const txt = (size) => ({
   color: "#fff",
   fontSize: size,
 });
