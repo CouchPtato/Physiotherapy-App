@@ -1,5 +1,5 @@
 import { CameraView } from "expo-camera";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Text,
@@ -17,6 +17,7 @@ const API_BASE = "http://192.168.1.8:8000";
 const FRAME_INTERVAL = 300;
 
 export default function LiveWorkoutScreen() {
+  const router = useRouter();
   const params = useLocalSearchParams();
 
   const exerciseKey = params.exerciseKey || "squat";
@@ -96,8 +97,9 @@ export default function LiveWorkoutScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.3,
+        quality: 0.25,
         skipProcessing: true,
+        mute: true, // 🔇 reduce shutter sound
       });
 
       const res = await fetch(`${API_BASE}/analyze_frame`, {
@@ -155,7 +157,7 @@ export default function LiveWorkoutScreen() {
         sets: totalSets,
         duration: elapsed,
         avg_time: totalReps ? elapsed / totalReps : 0,
-        form_score: 0.85, // placeholder (can be improved later)
+        form_score: 0.85,
       };
 
       const res = await fetch(`${API_BASE}/generate_report`, {
@@ -166,15 +168,9 @@ export default function LiveWorkoutScreen() {
 
       const data = await res.json();
       setPdfUrl(`${API_BASE}${data.url}`);
-    } catch {
-      // handle silently
     } finally {
       setGeneratingPdf(false);
     }
-  };
-
-  const openPdf = () => {
-    if (pdfUrl) Linking.openURL(pdfUrl);
   };
 
   const repeatWorkout = () => {
@@ -186,6 +182,11 @@ export default function LiveWorkoutScreen() {
     setWorkoutEnded(false);
     setSetCompleted(false);
     setPdfUrl(null);
+  };
+
+  const goBack = () => {
+    setRunning(false);
+    router.back();
   };
 
   /* ---------------- UI ---------------- */
@@ -200,17 +201,18 @@ export default function LiveWorkoutScreen() {
 
       <PoseSkiaOverlay keypointsSV={keypointsSV} />
 
+      {/* Back button */}
+      <TouchableOpacity
+        onPress={goBack}
+        style={btnStyle("rgba(0,0,0,0.6)", { left: 20 })}
+      >
+        <Ionicons name="chevron-back" size={22} color="#fff" />
+      </TouchableOpacity>
+
       {/* Camera toggle */}
       <TouchableOpacity
         onPress={toggleCamera}
-        style={{
-          position: "absolute",
-          top: 20,
-          right: 20,
-          padding: 10,
-          borderRadius: 20,
-          backgroundColor: "rgba(0,0,0,0.6)",
-        }}
+        style={btnStyle("rgba(0,0,0,0.6)", { right: 20 })}
       >
         <Ionicons name="camera-reverse" size={22} color="#fff" />
       </TouchableOpacity>
@@ -221,11 +223,11 @@ export default function LiveWorkoutScreen() {
           onPress={endWorkout}
           style={{
             position: "absolute",
-            top: 20,
-            left: 20,
-            padding: 10,
-            borderRadius: 20,
+            top: 40,
+            alignSelf: "center",
             backgroundColor: "#fecaca",
+            padding: 15,
+            borderRadius: 20,
           }}
         >
           <Text style={{ fontWeight: "700" }}>End</Text>
@@ -234,50 +236,45 @@ export default function LiveWorkoutScreen() {
 
       {/* Stats */}
       <View style={{ position: "absolute", bottom: 40, left: 20 }}>
-        <Text style={{ color: "#fff", fontSize: 20 }}>
-          Set {currentSet}/{totalSets}
-        </Text>
-        <Text style={{ color: "#fff", fontSize: 18 }}>
-          Reps: {repsThisSet}/{repsTarget}
-        </Text>
-        <Text style={{ color: "#fff" }}>
-          Angle: {angleUI}°
-        </Text>
-        <Text style={{ color: "#9ca3af" }}>
-          Time: {elapsed}s
-        </Text>
+        <Text style={text(20)}>Set {currentSet}/{totalSets}</Text>
+        <Text style={text(18)}>Reps: {repsThisSet}/{repsTarget}</Text>
+        <Text style={text(16)}>Angle: {angleUI}°</Text>
+        <Text style={{ color: "#9ca3af" }}>Time: {elapsed}s</Text>
       </View>
 
-      {/* SET COMPLETED */}
+      {/* Set completed */}
       {setCompleted && !workoutEnded && (
-        <OverlayBox>
-          <Text style={styles.title}>Set {currentSet} completed</Text>
-          <PrimaryBtn text="Start Next Set" onPress={startNextSet} />
-          <SecondaryBtn text="End Workout" onPress={endWorkout} />
-        </OverlayBox>
+        <Overlay>
+          <Title>Set {currentSet} completed</Title>
+          <Primary text="Start Next Set" onPress={startNextSet} />
+          <Secondary text="End Workout" onPress={endWorkout} />
+        </Overlay>
       )}
 
-      {/* WORKOUT ENDED */}
+      {/* Workout ended */}
       {workoutEnded && (
-        <OverlayBox>
-          <Text style={styles.title}>Workout completed</Text>
-          <Text style={styles.sub}>
+        <Overlay>
+          <Title>Workout completed</Title>
+          <Text style={{ color: "#9ca3af", marginBottom: 10 }}>
             Total reps: {totalReps}
           </Text>
 
           {!pdfUrl && (
-            <PrimaryBtn
+            <Primary
               text={generatingPdf ? "Generating..." : "Generate Report"}
               onPress={generatePdf}
             />
           )}
 
           {pdfUrl && (
-            <PrimaryBtn text="Open PDF Report" onPress={openPdf} />
+            <Primary
+              text="Open PDF Report"
+              onPress={() => Linking.openURL(pdfUrl)}
+            />
           )}
 
-          <SecondaryBtn text="Repeat Workout" onPress={repeatWorkout} />
-        </OverlayBox>
+          <Secondary text="Repeat Workout" onPress={repeatWorkout} />
+        </Overlay>
       )}
     </SafeAreaView>
   );
@@ -285,7 +282,17 @@ export default function LiveWorkoutScreen() {
 
 /* ---------------- REUSABLE UI ---------------- */
 
-const OverlayBox = ({ children }) => (
+const btnStyle = (bg, pos) => ({
+  position: "absolute",
+  top: 20,
+  padding: 10,
+  borderRadius: 20,
+  backgroundColor: bg,
+  zIndex: 50,
+  ...pos,
+});
+
+const Overlay = ({ children }) => (
   <View
     style={{
       position: "absolute",
@@ -301,7 +308,7 @@ const OverlayBox = ({ children }) => (
   </View>
 );
 
-const PrimaryBtn = ({ text, onPress }) => (
+const Primary = ({ text, onPress }) => (
   <TouchableOpacity
     onPress={onPress}
     style={{
@@ -316,7 +323,7 @@ const PrimaryBtn = ({ text, onPress }) => (
   </TouchableOpacity>
 );
 
-const SecondaryBtn = ({ text, onPress }) => (
+const Secondary = ({ text, onPress }) => (
   <TouchableOpacity
     onPress={onPress}
     style={{
@@ -331,7 +338,13 @@ const SecondaryBtn = ({ text, onPress }) => (
   </TouchableOpacity>
 );
 
-const styles = {
-  title: { color: "#fff", fontSize: 18, marginBottom: 6 },
-  sub: { color: "#9ca3af", marginBottom: 10 },
-};
+const Title = ({ children }) => (
+  <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8 }}>
+    {children}
+  </Text>
+);
+
+const text = (size) => ({
+  color: "#fff",
+  fontSize: size,
+});
