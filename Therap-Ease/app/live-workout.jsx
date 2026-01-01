@@ -1,7 +1,12 @@
 import { CameraView } from "expo-camera";
 import { useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Text, View, TouchableOpacity } from "react-native";
+import {
+  Text,
+  View,
+  TouchableOpacity,
+  Linking,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -15,13 +20,16 @@ export default function LiveWorkoutScreen() {
   const params = useLocalSearchParams();
 
   const exerciseKey = params.exerciseKey || "squat";
+  const exerciseName = params.name || exerciseKey;
   const repsTarget = Number(params.reps || 10);
   const totalSets = Number(params.sets || 1);
+  const patientName = params.patientName || "Somay Singh";
+  const patientId = params.patientId || "P-2025-001";
 
   const cameraRef = useRef(null);
   const frameTimer = useRef(null);
 
-  /* ---------------- UI STATE (LOW FREQUENCY) ---------------- */
+  /* ---------------- UI STATE ---------------- */
 
   const [facing, setFacing] = useState("front");
   const [currentSet, setCurrentSet] = useState(1);
@@ -30,9 +38,12 @@ export default function LiveWorkoutScreen() {
   const [angleUI, setAngleUI] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
-  const [setCompleted, setSetCompleted] = useState(false);
-  const [workoutCompleted, setWorkoutCompleted] = useState(false);
   const [running, setRunning] = useState(true);
+  const [setCompleted, setSetCompleted] = useState(false);
+  const [workoutEnded, setWorkoutEnded] = useState(false);
+
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   /* ---------------- REP CALLBACK ---------------- */
 
@@ -46,7 +57,7 @@ export default function LiveWorkoutScreen() {
         setSetCompleted(true);
 
         if (currentSet >= totalSets) {
-          setWorkoutCompleted(true);
+          setWorkoutEnded(true);
         }
       }
       return next;
@@ -58,7 +69,7 @@ export default function LiveWorkoutScreen() {
   const { processFrame, angleSV, keypointsSV } =
     usePoseStore(exerciseKey, onRep);
 
-  /* ---------------- ANGLE UI THROTTLE ---------------- */
+  /* ---------------- ANGLE UI (THROTTLED) ---------------- */
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -113,6 +124,15 @@ export default function LiveWorkoutScreen() {
 
   /* ---------------- ACTIONS ---------------- */
 
+  const toggleCamera = () =>
+    setFacing((f) => (f === "front" ? "back" : "front"));
+
+  const endWorkout = () => {
+    setRunning(false);
+    setSetCompleted(false);
+    setWorkoutEnded(true);
+  };
+
   const startNextSet = () => {
     setCurrentSet((s) => s + 1);
     setRepsThisSet(0);
@@ -120,18 +140,52 @@ export default function LiveWorkoutScreen() {
     setRunning(true);
   };
 
-  const redoWorkout = () => {
+  const generatePdf = async () => {
+    if (generatingPdf) return;
+    setGeneratingPdf(true);
+
+    try {
+      const payload = {
+        patient_name: patientName,
+        patient_id: patientId,
+        exercise: exerciseName,
+        exercise_key: exerciseKey,
+        reps: totalReps,
+        assigned_reps: repsTarget * totalSets,
+        sets: totalSets,
+        duration: elapsed,
+        avg_time: totalReps ? elapsed / totalReps : 0,
+        form_score: 0.85, // placeholder (can be improved later)
+      };
+
+      const res = await fetch(`${API_BASE}/generate_report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      setPdfUrl(`${API_BASE}${data.url}`);
+    } catch {
+      // handle silently
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
+  const openPdf = () => {
+    if (pdfUrl) Linking.openURL(pdfUrl);
+  };
+
+  const repeatWorkout = () => {
     setCurrentSet(1);
     setRepsThisSet(0);
     setTotalReps(0);
     setElapsed(0);
-    setSetCompleted(false);
-    setWorkoutCompleted(false);
     setRunning(true);
-  };
-
-  const toggleCamera = () => {
-    setFacing((f) => (f === "front" ? "back" : "front"));
+    setWorkoutEnded(false);
+    setSetCompleted(false);
+    setPdfUrl(null);
   };
 
   /* ---------------- UI ---------------- */
@@ -161,91 +215,123 @@ export default function LiveWorkoutScreen() {
         <Ionicons name="camera-reverse" size={22} color="#fff" />
       </TouchableOpacity>
 
+      {/* End workout anytime */}
+      {!workoutEnded && (
+        <TouchableOpacity
+          onPress={endWorkout}
+          style={{
+            position: "absolute",
+            top: 20,
+            left: 20,
+            padding: 10,
+            borderRadius: 20,
+            backgroundColor: "#fecaca",
+          }}
+        >
+          <Text style={{ fontWeight: "700" }}>End</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Stats */}
       <View style={{ position: "absolute", bottom: 40, left: 20 }}>
-        <Text style={{ color: "#fff", fontSize: 22 }}>
+        <Text style={{ color: "#fff", fontSize: 20 }}>
           Set {currentSet}/{totalSets}
         </Text>
-        <Text style={{ color: "#fff", fontSize: 20 }}>
+        <Text style={{ color: "#fff", fontSize: 18 }}>
           Reps: {repsThisSet}/{repsTarget}
         </Text>
-        <Text style={{ color: "#fff", fontSize: 18 }}>
+        <Text style={{ color: "#fff" }}>
           Angle: {angleUI}°
         </Text>
-        <Text style={{ color: "#9ca3af", fontSize: 14 }}>
+        <Text style={{ color: "#9ca3af" }}>
           Time: {elapsed}s
         </Text>
       </View>
 
       {/* SET COMPLETED */}
-      {setCompleted && !workoutCompleted && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 120,
-            left: 20,
-            right: 20,
-            padding: 16,
-            borderRadius: 12,
-            backgroundColor: "rgba(0,0,0,0.8)",
-          }}
-        >
-          <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8 }}>
-            Set {currentSet} completed
-          </Text>
-
-          <TouchableOpacity
-            onPress={startNextSet}
-            style={{
-              backgroundColor: "#22c55e",
-              padding: 12,
-              borderRadius: 8,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: "#000", fontWeight: "700" }}>
-              Start Next Set
-            </Text>
-          </TouchableOpacity>
-        </View>
+      {setCompleted && !workoutEnded && (
+        <OverlayBox>
+          <Text style={styles.title}>Set {currentSet} completed</Text>
+          <PrimaryBtn text="Start Next Set" onPress={startNextSet} />
+          <SecondaryBtn text="End Workout" onPress={endWorkout} />
+        </OverlayBox>
       )}
 
-      {/* WORKOUT COMPLETED */}
-      {workoutCompleted && (
-        <View
-          style={{
-            position: "absolute",
-            bottom: 120,
-            left: 20,
-            right: 20,
-            padding: 16,
-            borderRadius: 12,
-            backgroundColor: "rgba(0,0,0,0.85)",
-          }}
-        >
-          <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8 }}>
-            Workout completed 🎉
-          </Text>
-
-          <Text style={{ color: "#9ca3af", marginBottom: 12 }}>
+      {/* WORKOUT ENDED */}
+      {workoutEnded && (
+        <OverlayBox>
+          <Text style={styles.title}>Workout completed</Text>
+          <Text style={styles.sub}>
             Total reps: {totalReps}
           </Text>
 
-          <TouchableOpacity
-            onPress={redoWorkout}
-            style={{
-              backgroundColor: "#e5e7eb",
-              padding: 12,
-              borderRadius: 8,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ color: "#000", fontWeight: "700" }}>
-              Repeat Workout
-            </Text>
-          </TouchableOpacity>
-        </View>
+          {!pdfUrl && (
+            <PrimaryBtn
+              text={generatingPdf ? "Generating..." : "Generate Report"}
+              onPress={generatePdf}
+            />
+          )}
+
+          {pdfUrl && (
+            <PrimaryBtn text="Open PDF Report" onPress={openPdf} />
+          )}
+
+          <SecondaryBtn text="Repeat Workout" onPress={repeatWorkout} />
+        </OverlayBox>
       )}
     </SafeAreaView>
   );
 }
+
+/* ---------------- REUSABLE UI ---------------- */
+
+const OverlayBox = ({ children }) => (
+  <View
+    style={{
+      position: "absolute",
+      bottom: 120,
+      left: 20,
+      right: 20,
+      padding: 16,
+      borderRadius: 12,
+      backgroundColor: "rgba(0,0,0,0.85)",
+    }}
+  >
+    {children}
+  </View>
+);
+
+const PrimaryBtn = ({ text, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={{
+      backgroundColor: "#22c55e",
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 10,
+      alignItems: "center",
+    }}
+  >
+    <Text style={{ fontWeight: "700" }}>{text}</Text>
+  </TouchableOpacity>
+);
+
+const SecondaryBtn = ({ text, onPress }) => (
+  <TouchableOpacity
+    onPress={onPress}
+    style={{
+      backgroundColor: "#e5e7eb",
+      padding: 12,
+      borderRadius: 8,
+      marginTop: 8,
+      alignItems: "center",
+    }}
+  >
+    <Text style={{ fontWeight: "700" }}>{text}</Text>
+  </TouchableOpacity>
+);
+
+const styles = {
+  title: { color: "#fff", fontSize: 18, marginBottom: 6 },
+  sub: { color: "#9ca3af", marginBottom: 10 },
+};
