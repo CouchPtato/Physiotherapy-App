@@ -18,7 +18,7 @@ import logoimg from "../../assets/images/logo.png";
 import { ColorTheme, styles } from "../../constants/GlobalStyles.jsx";
 
 /* 🔗 BACKEND URL */
-const API_URL = "http://192.168.X.X:8000";
+const API_URL = "http://172.28.213.100:8000";
 
 /* ===================== VALIDATION ===================== */
 

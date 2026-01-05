@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ColorTheme } from "../constants/GlobalStyles";
 
-const API_BASE = "http://192.168.X.X:8000";
+const API_BASE = "http://172.28.213.100:8000";
 
 export default function UploadWorkoutScreen() {
   const router = useRouter();

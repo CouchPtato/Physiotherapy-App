@@ -8,7 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { usePoseStore } from "../hooks/use-pose-store";
 import { PoseSkiaOverlay } from "../components/pose/PoseSkiaOverlay";
 
-const API_BASE = "http://192.168.x.x:8000";
+const API_BASE = "http://172.28.213.100:8000";
 const FRAME_INTERVAL = 300;
 const MOTION_TIMEOUT_MS = 800; // how long pose keeps motion "alive"
 
