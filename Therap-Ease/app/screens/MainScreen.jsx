@@ -89,7 +89,7 @@ const MainScreen = ({ navigation, role: roleFromRoute }) => {
 
       {/* SETTINGS */}
       <Tab.Screen name="Settings">
-        {() => <SettingsScreen role={role} />}
+        {(props) => <SettingsScreen {...props} role={role} />}
       </Tab.Screen>
     </Tab.Navigator>
   );

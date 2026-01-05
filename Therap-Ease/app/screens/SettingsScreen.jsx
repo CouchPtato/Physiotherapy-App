@@ -11,13 +11,19 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import * as SecureStore from "expo-secure-store";
+import {
+  useNavigation,
+  CommonActions,
+} from "@react-navigation/native";
 
 import {
   ColorTheme,
   styles as globalStyles,
 } from "../../constants/GlobalStyles.jsx";
 
-function SettingsScreen({ navigation }) {
+function SettingsScreen() {
+  const navigation = useNavigation();
+
   /* ===================== STATE ===================== */
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
@@ -27,7 +33,7 @@ function SettingsScreen({ navigation }) {
   const [role, setRole] = useState("-");
   const [email, setEmail] = useState("-");
 
-  /* ===================== AUTH GUARD + LOAD USER ===================== */
+  /* ===================== LOAD USER ===================== */
   useEffect(() => {
     const init = async () => {
       const token = await SecureStore.getItemAsync("token");
@@ -35,7 +41,12 @@ function SettingsScreen({ navigation }) {
       const storedEmail = await SecureStore.getItemAsync("email");
 
       if (!token) {
-        navigation.replace("Authenticate");
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: "Authenticate" }],
+          })
+        );
         return;
       }
 
@@ -47,7 +58,7 @@ function SettingsScreen({ navigation }) {
   }, []);
 
   /* ===================== LOGOUT ===================== */
-  const handleLogout = async () => {
+  const handleLogout = () => {
     Alert.alert("Log Out", "Are you sure you want to log out?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -58,7 +69,12 @@ function SettingsScreen({ navigation }) {
           await SecureStore.deleteItemAsync("role");
           await SecureStore.deleteItemAsync("email");
 
-          navigation.replace("Authenticate");
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 0,
+              routes: [{ name: "Authenticate" }],
+            })
+          );
         },
       },
     ]);
@@ -108,17 +124,9 @@ function SettingsScreen({ navigation }) {
         {/* ===================== PREFERENCES ===================== */}
         <View style={localStyles.section}>
           <Text style={localStyles.sectionTitle}>Preferences</Text>
-          <Text style={localStyles.sectionSubtitle}>
-            Customize how the app behaves for you.
-          </Text>
 
           <View style={localStyles.toggleRow}>
-            <View style={localStyles.toggleTextBlock}>
-              <Text style={localStyles.toggleLabel}>Notifications</Text>
-              <Text style={localStyles.toggleHint}>
-                Alerts about sessions and updates.
-              </Text>
-            </View>
+            <Text style={localStyles.toggleLabel}>Notifications</Text>
             <Switch
               value={notifications}
               onValueChange={setNotifications}
@@ -128,12 +136,7 @@ function SettingsScreen({ navigation }) {
           </View>
 
           <View style={localStyles.toggleRow}>
-            <View style={localStyles.toggleTextBlock}>
-              <Text style={localStyles.toggleLabel}>Dark Mode</Text>
-              <Text style={localStyles.toggleHint}>
-                Reduce eye strain in low light.
-              </Text>
-            </View>
+            <Text style={localStyles.toggleLabel}>Dark Mode</Text>
             <Switch
               value={darkMode}
               onValueChange={setDarkMode}
@@ -143,12 +146,7 @@ function SettingsScreen({ navigation }) {
           </View>
 
           <View style={localStyles.toggleRow}>
-            <View style={localStyles.toggleTextBlock}>
-              <Text style={localStyles.toggleLabel}>Location Services</Text>
-              <Text style={localStyles.toggleHint}>
-                Better clinic suggestions.
-              </Text>
-            </View>
+            <Text style={localStyles.toggleLabel}>Location Services</Text>
             <Switch
               value={location}
               onValueChange={setLocation}
@@ -158,12 +156,7 @@ function SettingsScreen({ navigation }) {
           </View>
 
           <View style={localStyles.toggleRow}>
-            <View style={localStyles.toggleTextBlock}>
-              <Text style={localStyles.toggleLabel}>Auto Updates</Text>
-              <Text style={localStyles.toggleHint}>
-                Keep app updated automatically.
-              </Text>
-            </View>
+            <Text style={localStyles.toggleLabel}>Auto Updates</Text>
             <Switch
               value={autoUpdates}
               onValueChange={setAutoUpdates}
@@ -173,70 +166,15 @@ function SettingsScreen({ navigation }) {
           </View>
         </View>
 
-        {/* ===================== ACTIONS ===================== */}
+        {/* ===================== LOGOUT ===================== */}
         <View style={localStyles.section}>
-          <Text style={localStyles.sectionTitle}>Account Actions</Text>
-
-          <TouchableOpacity style={localStyles.actionRow}>
-            <View style={localStyles.actionLeft}>
-              <Ionicons
-                name="pencil-outline"
-                size={20}
-                color={ColorTheme.fourth}
-              />
-              <Text style={localStyles.actionText}>Edit Profile</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={ColorTheme.fourth}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={localStyles.actionRow}>
-            <View style={localStyles.actionLeft}>
-              <Ionicons
-                name="shield-checkmark-outline"
-                size={20}
-                color={ColorTheme.fourth}
-              />
-              <Text style={localStyles.actionText}>Privacy & Security</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={ColorTheme.fourth}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={localStyles.actionRow}>
-            <View style={localStyles.actionLeft}>
-              <Ionicons
-                name="help-circle-outline"
-                size={20}
-                color={ColorTheme.fourth}
-              />
-              <Text style={localStyles.actionText}>Help & Support</Text>
-            </View>
-            <Ionicons
-              name="chevron-forward"
-              size={18}
-              color={ColorTheme.fourth}
-            />
-          </TouchableOpacity>
-
-          {/* LOGOUT */}
           <TouchableOpacity
-            style={[localStyles.actionRow, localStyles.logoutRow]}
+            style={localStyles.logoutRow}
             onPress={handleLogout}
             activeOpacity={0.8}
           >
-            <View style={localStyles.actionLeft}>
-              <Ionicons name="log-out-outline" size={20} color="#ff6b6b" />
-              <Text style={[localStyles.actionText, { color: "#ff6b6b" }]}>
-                Log Out
-              </Text>
-            </View>
+            <Ionicons name="log-out-outline" size={22} color="#ff6b6b" />
+            <Text style={localStyles.logoutText}>Log Out</Text>
           </TouchableOpacity>
         </View>
 
@@ -268,40 +206,39 @@ const localStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: ColorTheme.fourth,
+    marginBottom: 6,
   },
   sectionSubtitle: {
     fontSize: 12,
     color: ColorTheme.fourth,
     opacity: 0.8,
-    marginBottom: 10,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: ColorTheme.fifth,
-    marginTop: 4,
+    marginTop: 6,
   },
-  rowLabel: { fontSize: 13, color: ColorTheme.fourth, opacity: 0.9 },
+  rowLabel: { fontSize: 13, color: ColorTheme.fourth },
   rowValue: { fontSize: 14, fontWeight: "600", color: ColorTheme.fourth },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 8,
-  },
-  toggleTextBlock: { flex: 1, paddingRight: 10 },
-  toggleLabel: { fontSize: 14, fontWeight: "600", color: ColorTheme.fourth },
-  toggleHint: { fontSize: 11, color: ColorTheme.fourth, opacity: 0.75 },
-  actionRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: 10,
   },
-  actionLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
-  actionText: { fontSize: 14, color: ColorTheme.fourth },
-  logoutRow: { marginTop: 8 },
+  toggleLabel: { fontSize: 14, color: ColorTheme.fourth },
+  logoutRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+  },
+  logoutText: {
+    fontSize: 16,
+    color: "#ff6b6b",
+    fontWeight: "600",
+  },
 });

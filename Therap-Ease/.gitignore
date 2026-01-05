@@ -43,3 +43,30 @@ app-example
 # generated native folders
 /ios
 /android
+
+# ===== Python =====
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.env
+
+# ===== Database =====
+*.db
+*.sqlite3
+
+# ===== Node / Expo =====
+node_modules/
+.expo/
+dist/
+
+# ===== OS files =====
+.DS_Store
+Thumbs.db
+
+# ===== Logs =====
+*.log
+
+# ===== VS Code =====
+.vscode/
