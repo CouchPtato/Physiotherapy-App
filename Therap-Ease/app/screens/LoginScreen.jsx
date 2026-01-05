@@ -7,14 +7,21 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import * as Yup from "yup";
+import * as SecureStore from "expo-secure-store";
+
 import logoimg from "../../assets/images/logo.png";
 import { ColorTheme, styles } from "../../constants/GlobalStyles.jsx";
 
-// Validation schemas
+/* 🔗 BACKEND URL */
+const API_URL = "http://192.168.X.X:8000";
+
+/* ===================== VALIDATION ===================== */
+
 const RegisterSchema = Yup.object().shape({
   email: Yup.string().email("Invalid email").required("Email is required"),
   password: Yup.string().min(4, "Too short!").required("Password is required"),
@@ -29,7 +36,8 @@ const LoginSchema = Yup.object().shape({
   password: Yup.string().required("Password is required"),
 });
 
-// Radio Button Component
+/* ===================== RADIO BUTTON ===================== */
+
 const RadioButton = ({ label, value, selected, onSelect }) => (
   <TouchableOpacity style={styles.radioOption} onPress={() => onSelect(value)}>
     <View
@@ -39,13 +47,14 @@ const RadioButton = ({ label, value, selected, onSelect }) => (
   </TouchableOpacity>
 );
 
-const LoginScreen = ( { navigation } ) => {
+/* ===================== MAIN SCREEN ===================== */
+
+const LoginScreen = ({ navigation }) => {
   const [showRegister, setShowRegister] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [role, setRole] = useState("patient");
   const [showDatePicker, setShowDatePicker] = useState(false);
 
-  // Animations
   const registerAnim = useRef(new Animated.Value(0)).current;
   const loginAnim = useRef(new Animated.Value(0)).current;
 
@@ -65,12 +74,78 @@ const LoginScreen = ( { navigation } ) => {
     }).start();
   }, [showLogin]);
 
+  /* ===================== REGISTER ===================== */
+
+  const handleRegister = async (values, resetForm) => {
+    try {
+      const res = await fetch(`${API_URL}/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: values.email,
+          password: values.password,
+          dob: values.dob,
+          role,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        Alert.alert("Registration Failed", data.detail || "Error");
+        return;
+      }
+
+      Alert.alert("Success", "Account created. Please login.");
+      resetForm();
+      setShowRegister(false);
+      setShowLogin(true);
+    } catch (err) {
+      Alert.alert("Error", "Server not reachable");
+    }
+  };
+
+  /* ===================== LOGIN ===================== */
+
+  const handleLogin = async (values, resetForm) => {
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: values.username,
+          password: values.password,
+          role,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        Alert.alert("Login Failed", data.detail || "Invalid credentials");
+        return;
+      }
+
+      /* 🔐 STORE TOKEN */
+      await SecureStore.setItemAsync("token", data.access_token);
+      await SecureStore.setItemAsync("role", data.role);
+
+      resetForm();
+      navigation.replace("MainApp", { role: data.role });
+
+    } catch (err) {
+      Alert.alert("Error", "Server not reachable");
+    }
+  };
+
+  /* ===================== UI ===================== */
+
   return (
     <SafeAreaView style={{ flex: 1, justifyContent: "center" }}>
       <View style={styles.container}>
         <Image source={logoimg} style={styles.logo} />
 
-        {/* Register Button */}
+        {/* REGISTER BUTTON */}
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => {
@@ -81,7 +156,7 @@ const LoginScreen = ( { navigation } ) => {
           <Text style={styles.paragraph}>Register</Text>
         </TouchableOpacity>
 
-        {/* Register Form */}
+        {/* REGISTER FORM */}
         <Animated.View
           style={[
             styles.formContainer,
@@ -95,18 +170,11 @@ const LoginScreen = ( { navigation } ) => {
           ]}
         >
           <Formik
-            initialValues={{
-              email: "",
-              password: "",
-              confirm: "",
-              dob: "",
-            }}
+            initialValues={{ email: "", password: "", confirm: "", dob: "" }}
             validationSchema={RegisterSchema}
-            onSubmit={(values, { resetForm }) => {
-              resetForm();
-              setShowRegister(false);
-              navigation.replace("Home"); 
-            }}
+            onSubmit={(values, { resetForm }) =>
+              handleRegister(values, resetForm)
+            }
           >
             {({
               handleChange,
@@ -120,14 +188,12 @@ const LoginScreen = ( { navigation } ) => {
               <>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Email"
+                  placeholder="Email"
                   value={values.email}
                   onChangeText={handleChange("email")}
                   onBlur={handleBlur("email")}
                 />
-                {touched.email && errors.email && (
-                  <Text style={styles.errorText}>{errors.email}</Text>
-                )}
+                {touched.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
                 <TextInput
                   style={styles.input}
@@ -135,11 +201,7 @@ const LoginScreen = ( { navigation } ) => {
                   secureTextEntry
                   value={values.password}
                   onChangeText={handleChange("password")}
-                  onBlur={handleBlur("password")}
                 />
-                {touched.password && errors.password && (
-                  <Text style={styles.errorText}>{errors.password}</Text>
-                )}
 
                 <TextInput
                   style={styles.input}
@@ -147,68 +209,45 @@ const LoginScreen = ( { navigation } ) => {
                   secureTextEntry
                   value={values.confirm}
                   onChangeText={handleChange("confirm")}
-                  onBlur={handleBlur("confirm")}
                 />
-                {touched.confirm && errors.confirm && (
-                  <Text style={styles.errorText}>{errors.confirm}</Text>
-                )}
 
-                {/* DOB */}
                 <TouchableOpacity
                   style={styles.input}
                   onPress={() => setShowDatePicker(true)}
                 >
-                  <Text>{values.dob || "Select Date of Birth"}</Text>
+                  <Text>{values.dob || "Select DOB"}</Text>
                 </TouchableOpacity>
-                {touched.dob && errors.dob && (
-                  <Text style={styles.errorText}>{errors.dob}</Text>
-                )}
+
                 {showDatePicker && (
                   <DateTimePicker
-                    mode="date"
-                    display="default"
                     value={new Date()}
+                    mode="date"
                     maximumDate={new Date()}
-                    onChange={(event, selectedDate) => {
+                    onChange={(e, date) => {
                       setShowDatePicker(false);
-                      if (selectedDate) {
-                        const formatted = selectedDate
-                          .toISOString()
-                          .split("T")[0];
-                        setFieldValue("dob", formatted);
-                      }
+                      if (date)
+                        setFieldValue(
+                          "dob",
+                          date.toISOString().split("T")[0]
+                        );
                     }}
                   />
                 )}
 
-                {/* Role Selection */}
                 <View style={styles.radioGroup}>
-                  <RadioButton
-                    label="Doctor"
-                    value="doctor"
-                    selected={role}
-                    onSelect={setRole}
-                  />
-                  <RadioButton
-                    label="Patient"
-                    value="patient"
-                    selected={role}
-                    onSelect={setRole}
-                  />
+                  <RadioButton label="Doctor" value="doctor" selected={role} onSelect={setRole} />
+                  <RadioButton label="Patient" value="patient" selected={role} onSelect={setRole} />
                 </View>
 
-                <TouchableOpacity
-                  style={styles.submitButton}
-                  onPress={handleSubmit}
-                >
-                  <Text style={styles.submitText}>Submit</Text>
+                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                  <Text style={styles.submitText}>Register</Text>
                 </TouchableOpacity>
               </>
             )}
           </Formik>
         </Animated.View>
 
-        {/* Login Button */}
+        {/* LOGIN BUTTON */}
         <TouchableOpacity
           style={[styles.actionButton, { marginTop: 10 }]}
           onPress={() => {
@@ -219,7 +258,7 @@ const LoginScreen = ( { navigation } ) => {
           <Text style={styles.paragraph}>Login</Text>
         </TouchableOpacity>
 
-        {/* Login Form */}
+        {/* LOGIN FORM */}
         <Animated.View
           style={[
             styles.formContainer,
@@ -233,99 +272,40 @@ const LoginScreen = ( { navigation } ) => {
           ]}
         >
           <Formik
-            initialValues={{
-              username: "",
-              password: "",
-            }}
+            initialValues={{ username: "", password: "" }}
             validationSchema={LoginSchema}
-            onSubmit={(values, { resetForm }) => {
-              resetForm();
-              setShowLogin(false);
-              navigation.replace("Home"); // Navigate to HomeScreen after login
-            }}
+            onSubmit={(values, { resetForm }) =>
+              handleLogin(values, resetForm)
+            }
           >
-            {({
-              handleChange,
-              handleBlur,
-              handleSubmit,
-              values,
-              errors,
-              touched,
-            }) => (
+            {({ handleChange, handleSubmit, values }) => (
               <>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Username"
+                  placeholder="Username"
                   value={values.username}
                   onChangeText={handleChange("username")}
-                  onBlur={handleBlur("username")}
                 />
-                {touched.username && errors.username && (
-                  <Text style={styles.errorText}>{errors.username}</Text>
-                )}
-
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter Password"
+                  placeholder="Password"
                   secureTextEntry
                   value={values.password}
                   onChangeText={handleChange("password")}
-                  onBlur={handleBlur("password")}
                 />
-                {touched.password && errors.password && (
-                  <Text style={styles.errorText}>{errors.password}</Text>
-                )}
 
-                {/* Role */}
                 <View style={styles.radioGroup}>
-                  <RadioButton
-                    label="Doctor"
-                    value="doctor"
-                    selected={role}
-                    onSelect={setRole}
-                  />
-                  <RadioButton
-                    label="Patient"
-                    value="patient"
-                    selected={role}
-                    onSelect={setRole}
-                  />
+                  <RadioButton label="Doctor" value="doctor" selected={role} onSelect={setRole} />
+                  <RadioButton label="Patient" value="patient" selected={role} onSelect={setRole} />
                 </View>
 
-                <TouchableOpacity
-                  style={styles.submitButton}
-                  onPress={handleSubmit}
-                >
-                  <Text style={styles.submitText}>Submit</Text>
+                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                  <Text style={styles.submitText}>Login</Text>
                 </TouchableOpacity>
               </>
             )}
           </Formik>
         </Animated.View>
-
-        {/* Main Button */}
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            { marginTop: 10, backgroundColor: ColorTheme.second },
-          ]}
-          onPress={() => navigation.navigate('MainApp', { role: "patient" })}
-        >
-          <Text style={[styles.paragraph, { color: ColorTheme.fourth }]}>
-            Open Patient
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.actionButton,
-            { marginTop: 10, backgroundColor: ColorTheme.second },
-          ]}
-          onPress={() => navigation.navigate('MainApp', { role: "doctor" })}
-        >
-          <Text style={[styles.paragraph, { color: ColorTheme.fourth }]}>
-            Open Doctor
-          </Text>
-        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
