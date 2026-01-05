@@ -16,9 +16,7 @@ import * as SecureStore from "expo-secure-store";
 
 import logoimg from "../../assets/images/logo.png";
 import { ColorTheme, styles } from "../../constants/GlobalStyles.jsx";
-
-/* 🔗 BACKEND URL */
-const API_URL = "http://172.28.213.100:8000";
+import { LOGIN_API, REGISTER_API } from "../../constants/api";
 
 /* ===================== VALIDATION ===================== */
 
@@ -32,7 +30,7 @@ const RegisterSchema = Yup.object().shape({
 });
 
 const LoginSchema = Yup.object().shape({
-  username: Yup.string().required("Username is required"),
+  username: Yup.string().required("Email is required"),
   password: Yup.string().required("Password is required"),
 });
 
@@ -78,7 +76,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleRegister = async (values, resetForm) => {
     try {
-      const res = await fetch(`${API_URL}/register`, {
+      const res = await fetch(REGISTER_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -109,11 +107,11 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async (values, resetForm) => {
     try {
-      const res = await fetch(`${API_URL}/login`, {
+      const res = await fetch(LOGIN_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: values.username,
+          username: values.username, // email
           password: values.password,
           role,
         }),
@@ -126,13 +124,13 @@ const LoginScreen = ({ navigation }) => {
         return;
       }
 
-      /* 🔐 STORE TOKEN */
+      /* 🔐 STORE AUTH DATA */
       await SecureStore.setItemAsync("token", data.access_token);
       await SecureStore.setItemAsync("role", data.role);
+      await SecureStore.setItemAsync("email", values.username);
 
       resetForm();
       navigation.replace("MainApp", { role: data.role });
-
     } catch (err) {
       Alert.alert("Error", "Server not reachable");
     }
@@ -178,7 +176,6 @@ const LoginScreen = ({ navigation }) => {
           >
             {({
               handleChange,
-              handleBlur,
               handleSubmit,
               setFieldValue,
               values,
@@ -191,9 +188,10 @@ const LoginScreen = ({ navigation }) => {
                   placeholder="Email"
                   value={values.email}
                   onChangeText={handleChange("email")}
-                  onBlur={handleBlur("email")}
                 />
-                {touched.email && <Text style={styles.errorText}>{errors.email}</Text>}
+                {touched.email && errors.email && (
+                  <Text style={styles.errorText}>{errors.email}</Text>
+                )}
 
                 <TextInput
                   style={styles.input}
@@ -235,11 +233,24 @@ const LoginScreen = ({ navigation }) => {
                 )}
 
                 <View style={styles.radioGroup}>
-                  <RadioButton label="Doctor" value="doctor" selected={role} onSelect={setRole} />
-                  <RadioButton label="Patient" value="patient" selected={role} onSelect={setRole} />
+                  <RadioButton
+                    label="Doctor"
+                    value="doctor"
+                    selected={role}
+                    onSelect={setRole}
+                  />
+                  <RadioButton
+                    label="Patient"
+                    value="patient"
+                    selected={role}
+                    onSelect={setRole}
+                  />
                 </View>
 
-                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.submitText}>Register</Text>
                 </TouchableOpacity>
               </>
@@ -282,10 +293,11 @@ const LoginScreen = ({ navigation }) => {
               <>
                 <TextInput
                   style={styles.input}
-                  placeholder="Username"
+                  placeholder="Email"
                   value={values.username}
                   onChangeText={handleChange("username")}
                 />
+
                 <TextInput
                   style={styles.input}
                   placeholder="Password"
@@ -295,11 +307,24 @@ const LoginScreen = ({ navigation }) => {
                 />
 
                 <View style={styles.radioGroup}>
-                  <RadioButton label="Doctor" value="doctor" selected={role} onSelect={setRole} />
-                  <RadioButton label="Patient" value="patient" selected={role} onSelect={setRole} />
+                  <RadioButton
+                    label="Doctor"
+                    value="doctor"
+                    selected={role}
+                    onSelect={setRole}
+                  />
+                  <RadioButton
+                    label="Patient"
+                    value="patient"
+                    selected={role}
+                    onSelect={setRole}
+                  />
                 </View>
 
-                <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+                <TouchableOpacity
+                  style={styles.submitButton}
+                  onPress={handleSubmit}
+                >
                   <Text style={styles.submitText}>Login</Text>
                 </TouchableOpacity>
               </>

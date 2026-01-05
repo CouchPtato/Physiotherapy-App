@@ -15,9 +15,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
 import { ColorTheme } from "../constants/GlobalStyles";
 
-const API_BASE = "http://172.28.213.100:8000";
+/* ✅ COMMON API BASE */
+import { API_BASE } from "../constants/api";
 
 export default function UploadWorkoutScreen() {
   const router = useRouter();
@@ -37,9 +39,13 @@ export default function UploadWorkoutScreen() {
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
+  /* ---------------- NAV ---------------- */
+
   const handleBack = () => {
     router.back();
   };
+
+  /* ---------------- PICK VIDEO ---------------- */
 
   const handleChooseVideo = async () => {
     try {
@@ -49,17 +55,22 @@ export default function UploadWorkoutScreen() {
       if (result.canceled) return;
 
       const asset =
-        result.assets && result.assets.length > 0 ? result.assets[0] : result;
+        result.assets && result.assets.length > 0
+          ? result.assets[0]
+          : result;
 
       setSelectedVideo(asset);
       setAnalysisData(null);
       setProcessedVideoUri(null);
       setPdfUrl(null);
+
       Alert.alert("Video Selected", asset.name || "Video ready");
-    } catch (err) {
+    } catch {
       Alert.alert("Error", "Could not select a video.");
     }
   };
+
+  /* ---------------- ANALYZE VIDEO ---------------- */
 
   const handleAnalyze = async () => {
     if (!selectedVideo) {
@@ -99,25 +110,32 @@ export default function UploadWorkoutScreen() {
       });
 
       if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        console.log("Analyze error response:", errText);
         Alert.alert("Error", "Failed to analyze the uploaded video.");
         return;
       }
 
       const data = await res.json();
       setAnalysisData(data);
+
       if (data.processed_video_url) {
         setProcessedVideoUri(`${API_BASE}${data.processed_video_url}`);
       }
-      Alert.alert("Analysis Complete", `Reps detected: ${data.reps ?? "N/A"}`);
-    } catch (err) {
-      console.log("Analyze error:", err);
-      Alert.alert("Error", "Something went wrong while analyzing the video.");
+
+      Alert.alert(
+        "Analysis Complete",
+        `Reps detected: ${data.reps ?? "N/A"}`
+      );
+    } catch {
+      Alert.alert(
+        "Error",
+        "Something went wrong while analyzing the video."
+      );
     } finally {
       setIsAnalyzing(false);
     }
   };
+
+  /* ---------------- GENERATE PDF ---------------- */
 
   const handleGeneratePdf = async () => {
     if (!analysisData) {
@@ -153,8 +171,6 @@ export default function UploadWorkoutScreen() {
       });
 
       if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        console.log("Generate PDF error:", errText);
         Alert.alert("Error", "Failed to generate PDF report.");
         return;
       }
@@ -162,12 +178,17 @@ export default function UploadWorkoutScreen() {
       const data = await res.json();
       const fullUrl = `${API_BASE}${data.url}`;
       setPdfUrl(fullUrl);
-      Alert.alert("Report Ready", "Tap 'Open PDF' to view or download.");
-    } catch (e) {
-      console.log("Generate PDF error:", e);
-      Alert.alert("Error", "Something went wrong while generating the report.");
+
+      Alert.alert("Report Ready", "Tap 'Open PDF' to view.");
+    } catch {
+      Alert.alert(
+        "Error",
+        "Something went wrong while generating the report."
+      );
     }
   };
+
+  /* ---------------- OPEN PDF ---------------- */
 
   const handleOpenPdf = () => {
     if (pdfUrl) {
@@ -177,16 +198,25 @@ export default function UploadWorkoutScreen() {
     }
   };
 
+  /* ---------------- UI VALUES ---------------- */
+
   const duration = analysisData?.duration ?? 0;
   const reps = analysisData?.reps ?? 0;
   const formScore = analysisData?.form_score ?? 0;
+
+  /* ---------------- UI ---------------- */
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
-          <Ionicons name="chevron-back" size={22} color={ColorTheme.fourth} />
+          <Ionicons
+            name="chevron-back"
+            size={22}
+            color={ColorTheme.fourth}
+          />
         </TouchableOpacity>
+
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>{name}</Text>
           <Text style={styles.headerSub}>Upload & Analyze Video</Text>
@@ -197,6 +227,7 @@ export default function UploadWorkoutScreen() {
             </Text>
           ) : null}
         </View>
+
         <View style={styles.chip}>
           <Ionicons
             name="person-outline"
@@ -221,23 +252,23 @@ export default function UploadWorkoutScreen() {
               useNativeControls
               isLooping
               shouldPlay
-              onError={(e) => console.log("Video error:", e)}
             />
           ) : (
             <View style={styles.videoPlaceholder}>
               <Ionicons name="videocam-outline" size={40} color="#9ca3af" />
               <Text style={styles.videoPlaceholderText}>
-                Choose a video and tap "Analyze Video" to see tracking.
+                Choose a video and analyze to see results.
               </Text>
             </View>
           )}
         </View>
 
-        {/* Loading row under video when analyzing */}
         {isAnalyzing && (
           <View style={styles.loadingRow}>
             <ActivityIndicator size="small" color={ColorTheme.fourth} />
-            <Text style={styles.loadingText}>Analyzing video, please wait…</Text>
+            <Text style={styles.loadingText}>
+              Analyzing video, please wait…
+            </Text>
           </View>
         )}
 
@@ -262,9 +293,9 @@ export default function UploadWorkoutScreen() {
             style={[
               styles.mainBtn,
               styles.primaryBtn,
-              { marginBottom: 8, opacity: isAnalyzing ? 0.6 : 1 },
+              { opacity: isAnalyzing ? 0.6 : 1 },
             ]}
-            onPress={isAnalyzing ? undefined : handleAnalyze}
+            onPress={handleAnalyze}
             disabled={isAnalyzing}
           >
             <Ionicons
@@ -292,20 +323,15 @@ export default function UploadWorkoutScreen() {
           <View style={styles.statsRow}>
             <Text style={styles.statsLabel}>Form Score</Text>
             <Text style={styles.statsValue}>
-              {formScore > 1
-                ? formScore.toFixed(1)
-                : (formScore * 100).toFixed(1)}
-              /100
+              {(formScore * 100).toFixed(1)}/100
             </Text>
           </View>
         </View>
 
         <View style={styles.pdfSection}>
-          <Text style={styles.statsTitle}>Session Report</Text>
           <TouchableOpacity
-            style={[styles.mainBtn, styles.primaryBtn, { marginTop: 8 }]}
+            style={[styles.mainBtn, styles.primaryBtn]}
             onPress={handleGeneratePdf}
-            disabled={isAnalyzing}
           >
             <Ionicons
               name="document-text-outline"
@@ -339,6 +365,8 @@ export default function UploadWorkoutScreen() {
     </SafeAreaView>
   );
 }
+
+/* ---------------- STYLES ---------------- */
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: ColorTheme.first },
@@ -392,10 +420,7 @@ const styles = StyleSheet.create({
   mainBtnText: { fontSize: 14, fontWeight: "700" },
   primaryBtn: { backgroundColor: ColorTheme.fourth },
   secondaryBtn: { backgroundColor: "#e5e7eb" },
-  openBtn: {
-    marginTop: 8,
-    backgroundColor: "#6b7280",
-  },
+  openBtn: { marginTop: 8, backgroundColor: "#6b7280" },
   statsCard: {
     marginTop: 14,
     borderRadius: 12,
@@ -419,11 +444,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: ColorTheme.fourth,
   },
-  pdfSection: {
-    marginTop: 16,
-    marginBottom: 10,
-  },
-  
+  pdfSection: { marginTop: 16, marginBottom: 10 },
   loadingRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -433,6 +454,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginLeft: 8,
     fontSize: 12,
-    color: "#6095ffff",
+    color: "#6095ff",
   },
 });

@@ -8,9 +8,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { usePoseStore } from "../hooks/use-pose-store";
 import { PoseSkiaOverlay } from "../components/pose/PoseSkiaOverlay";
 
-const API_BASE = "http://172.28.213.100:8000";
+/* ✅ COMMON API BASE */
+import { API_BASE } from "../constants/api";
+
 const FRAME_INTERVAL = 300;
-const MOTION_TIMEOUT_MS = 800; // how long pose keeps motion "alive"
+const MOTION_TIMEOUT_MS = 800;
 
 export default function LiveWorkoutScreen() {
   const router = useRouter();
@@ -100,13 +102,7 @@ export default function LiveWorkoutScreen() {
   /* ---------------- FRAME LOOP ---------------- */
 
   const captureFrame = async () => {
-    if (
-      !cameraRef.current ||
-      !running ||
-      stoppedRef.current
-    ) {
-      return;
-    }
+    if (!cameraRef.current || !running || stoppedRef.current) return;
 
     try {
       const photo = await cameraRef.current.takePictureAsync({
@@ -128,7 +124,6 @@ export default function LiveWorkoutScreen() {
       const data = await res.json();
       const keypoints = data.pose?.keypoints || [];
 
-      // ✅ MOTION = POSE PRESENT
       if (keypoints.length > 0) {
         lastPoseTsRef.current = Date.now();
         setMotionUI(true);
@@ -138,13 +133,10 @@ export default function LiveWorkoutScreen() {
           totalFormScoreRef.current += lastFormScoreRef.current;
           formFrameCountRef.current += 1;
         }
-      } else {
-        // Check timeout
-        if (
-          Date.now() - lastPoseTsRef.current > MOTION_TIMEOUT_MS
-        ) {
-          setMotionUI(false);
-        }
+      } else if (
+        Date.now() - lastPoseTsRef.current > MOTION_TIMEOUT_MS
+      ) {
+        setMotionUI(false);
       }
     } catch {
       // ignore dropped frames
@@ -154,10 +146,7 @@ export default function LiveWorkoutScreen() {
   useEffect(() => {
     if (!running || workoutEnded) return;
 
-    frameTimerRef.current = setInterval(
-      captureFrame,
-      FRAME_INTERVAL
-    );
+    frameTimerRef.current = setInterval(captureFrame, FRAME_INTERVAL);
 
     return () => {
       clearInterval(frameTimerRef.current);
@@ -199,8 +188,7 @@ export default function LiveWorkoutScreen() {
 
     const avgFormScore =
       formFrameCountRef.current > 0
-        ? totalFormScoreRef.current /
-          formFrameCountRef.current
+        ? totalFormScoreRef.current / formFrameCountRef.current
         : 0;
 
     try {
@@ -217,14 +205,11 @@ export default function LiveWorkoutScreen() {
         form_score: avgFormScore,
       };
 
-      const res = await fetch(
-        `${API_BASE}/generate_report`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API_BASE}/generate_report`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
       const data = await res.json();
       setPdfUrl(`${API_BASE}${data.url}`);
@@ -260,11 +245,7 @@ export default function LiveWorkoutScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
       {!workoutEnded && (
-        <CameraView
-          ref={cameraRef}
-          style={{ flex: 1 }}
-          facing={facing}
-        />
+        <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} />
       )}
 
       <PoseSkiaOverlay keypointsSV={keypointsSV} />
@@ -290,17 +271,9 @@ export default function LiveWorkoutScreen() {
         <Text style={txt(18)}>
           Reps: {repsThisSet}/{repsTarget}
         </Text>
-        <Text style={txt(16)}>
-          Angle: {angleUI}°
-        </Text>
-        <Text style={{ color: "#9ca3af" }}>
-          Time: {elapsed}s
-        </Text>
-        <Text
-          style={{
-            color: motionUI ? "#22c55e" : "#9ca3af",
-          }}
-        >
+        <Text style={txt(16)}>Angle: {angleUI}°</Text>
+        <Text style={{ color: "#9ca3af" }}>Time: {elapsed}s</Text>
+        <Text style={{ color: motionUI ? "#22c55e" : "#9ca3af" }}>
           {motionUI ? "Motion detected" : "Idle"}
         </Text>
       </View>
@@ -310,11 +283,7 @@ export default function LiveWorkoutScreen() {
           <Title>Workout completed</Title>
           {!pdfUrl && (
             <Primary
-              text={
-                generatingPdf
-                  ? "Generating..."
-                  : "Generate Report"
-              }
+              text={generatingPdf ? "Generating..." : "Generate Report"}
               onPress={generatePdf}
             />
           )}
@@ -324,10 +293,7 @@ export default function LiveWorkoutScreen() {
               onPress={() => Linking.openURL(pdfUrl)}
             />
           )}
-          <Secondary
-            text="Repeat Workout"
-            onPress={repeatWorkout}
-          />
+          <Secondary text="Repeat Workout" onPress={repeatWorkout} />
         </Overlay>
       )}
     </SafeAreaView>
@@ -402,13 +368,7 @@ const Secondary = ({ text, onPress }) => (
 );
 
 const Title = ({ children }) => (
-  <Text
-    style={{
-      color: "#fff",
-      fontSize: 18,
-      marginBottom: 8,
-    }}
-  >
+  <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8 }}>
     {children}
   </Text>
 );
