@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -6,16 +6,63 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
-import { ColorTheme, styles as globalStyles } from "../../constants/GlobalStyles.jsx";
+import * as SecureStore from "expo-secure-store";
 
-function SettingsScreen({navigation}) {
+import {
+  ColorTheme,
+  styles as globalStyles,
+} from "../../constants/GlobalStyles.jsx";
+
+function SettingsScreen({ navigation }) {
+  /* ===================== STATE ===================== */
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
   const [location, setLocation] = useState(false);
   const [autoUpdates, setAutoUpdates] = useState(true);
+
+  const [role, setRole] = useState("-");
+  const [email, setEmail] = useState("-");
+
+  /* ===================== AUTH GUARD + LOAD USER ===================== */
+  useEffect(() => {
+    const init = async () => {
+      const token = await SecureStore.getItemAsync("token");
+      const storedRole = await SecureStore.getItemAsync("role");
+      const storedEmail = await SecureStore.getItemAsync("email");
+
+      if (!token) {
+        navigation.replace("Authenticate");
+        return;
+      }
+
+      setRole(storedRole || "-");
+      setEmail(storedEmail || "-");
+    };
+
+    init();
+  }, []);
+
+  /* ===================== LOGOUT ===================== */
+  const handleLogout = async () => {
+    Alert.alert("Log Out", "Are you sure you want to log out?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Log Out",
+        style: "destructive",
+        onPress: async () => {
+          await SecureStore.deleteItemAsync("token");
+          await SecureStore.deleteItemAsync("role");
+          await SecureStore.deleteItemAsync("email");
+
+          navigation.replace("Authenticate");
+        },
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={[globalStyles.screen, localStyles.screen]}>
@@ -24,7 +71,7 @@ function SettingsScreen({navigation}) {
         contentContainerStyle={localStyles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Section: Profile overview */}
+        {/* ===================== ACCOUNT ===================== */}
         <View style={localStyles.section}>
           <Text style={localStyles.sectionTitle}>Account Overview</Text>
           <Text style={localStyles.sectionSubtitle}>
@@ -34,7 +81,9 @@ function SettingsScreen({navigation}) {
           <View style={localStyles.row}>
             <View>
               <Text style={localStyles.rowLabel}>Account Type</Text>
-              <Text style={localStyles.rowValue}>Patient</Text>
+              <Text style={localStyles.rowValue}>
+                {role === "doctor" ? "Doctor" : "Patient"}
+              </Text>
             </View>
             <Ionicons
               name="person-circle-outline"
@@ -46,7 +95,7 @@ function SettingsScreen({navigation}) {
           <View style={localStyles.row}>
             <View>
               <Text style={localStyles.rowLabel}>Email</Text>
-              <Text style={localStyles.rowValue}>user@example.com</Text>
+              <Text style={localStyles.rowValue}>{email}</Text>
             </View>
             <Ionicons
               name="mail-outline"
@@ -56,71 +105,79 @@ function SettingsScreen({navigation}) {
           </View>
         </View>
 
-        {/* Section: Toggles */}
+        {/* ===================== PREFERENCES ===================== */}
         <View style={localStyles.section}>
           <Text style={localStyles.sectionTitle}>Preferences</Text>
           <Text style={localStyles.sectionSubtitle}>
             Customize how the app behaves for you.
           </Text>
 
-          {/* Notifications */}
           <View style={localStyles.toggleRow}>
             <View style={localStyles.toggleTextBlock}>
               <Text style={localStyles.toggleLabel}>Notifications</Text>
               <Text style={localStyles.toggleHint}>
-                Get alerts about sessions, reminders, and updates.
+                Alerts about sessions and updates.
               </Text>
             </View>
-            <Switch value={notifications} onValueChange={setNotifications} 
-            thumbColor={ColorTheme.fourth}
-            trackColor={ColorTheme.fifth}/>
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              thumbColor={ColorTheme.fourth}
+              trackColor={{ true: ColorTheme.fifth }}
+            />
           </View>
 
-          {/* Dark Mode */}
           <View style={localStyles.toggleRow}>
             <View style={localStyles.toggleTextBlock}>
               <Text style={localStyles.toggleLabel}>Dark Mode</Text>
               <Text style={localStyles.toggleHint}>
-                Use a darker theme to reduce eye strain.
+                Reduce eye strain in low light.
               </Text>
             </View>
-            <Switch value={darkMode} onValueChange={setDarkMode} 
-            thumbColor={ColorTheme.fourth}
-            trackColor={ColorTheme.fifth}/>
+            <Switch
+              value={darkMode}
+              onValueChange={setDarkMode}
+              thumbColor={ColorTheme.fourth}
+              trackColor={{ true: ColorTheme.fifth }}
+            />
           </View>
 
-          {/* Location Services */}
           <View style={localStyles.toggleRow}>
             <View style={localStyles.toggleTextBlock}>
               <Text style={localStyles.toggleLabel}>Location Services</Text>
               <Text style={localStyles.toggleHint}>
-                Allow location for better clinic suggestions.
+                Better clinic suggestions.
               </Text>
             </View>
-            <Switch value={location} onValueChange={setLocation} 
-            thumbColor={ColorTheme.fourth}
-            trackColor={ColorTheme.fifth}/>
+            <Switch
+              value={location}
+              onValueChange={setLocation}
+              thumbColor={ColorTheme.fourth}
+              trackColor={{ true: ColorTheme.fifth }}
+            />
           </View>
 
-          {/* Auto-Updates */}
           <View style={localStyles.toggleRow}>
             <View style={localStyles.toggleTextBlock}>
-              <Text style={localStyles.toggleLabel}>Auto-Updates</Text>
+              <Text style={localStyles.toggleLabel}>Auto Updates</Text>
               <Text style={localStyles.toggleHint}>
-                Keep the app up to date automatically.
+                Keep app updated automatically.
               </Text>
             </View>
-            <Switch value={autoUpdates} onValueChange={setAutoUpdates} 
-            thumbColor={ColorTheme.fourth}
-            trackColor={ColorTheme.fifth}/>
+            <Switch
+              value={autoUpdates}
+              onValueChange={setAutoUpdates}
+              thumbColor={ColorTheme.fourth}
+              trackColor={{ true: ColorTheme.fifth }}
+            />
           </View>
         </View>
 
-        {/* Section: Actions */}
+        {/* ===================== ACTIONS ===================== */}
         <View style={localStyles.section}>
           <Text style={localStyles.sectionTitle}>Account Actions</Text>
 
-          <TouchableOpacity style={localStyles.actionRow} activeOpacity={0.5}>
+          <TouchableOpacity style={localStyles.actionRow}>
             <View style={localStyles.actionLeft}>
               <Ionicons
                 name="pencil-outline"
@@ -136,7 +193,7 @@ function SettingsScreen({navigation}) {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={localStyles.actionRow} activeOpacity={0.5}>
+          <TouchableOpacity style={localStyles.actionRow}>
             <View style={localStyles.actionLeft}>
               <Ionicons
                 name="shield-checkmark-outline"
@@ -152,7 +209,7 @@ function SettingsScreen({navigation}) {
             />
           </TouchableOpacity>
 
-          <TouchableOpacity style={localStyles.actionRow} activeOpacity={0.5}>
+          <TouchableOpacity style={localStyles.actionRow}>
             <View style={localStyles.actionLeft}>
               <Ionicons
                 name="help-circle-outline"
@@ -168,8 +225,10 @@ function SettingsScreen({navigation}) {
             />
           </TouchableOpacity>
 
+          {/* LOGOUT */}
           <TouchableOpacity
             style={[localStyles.actionRow, localStyles.logoutRow]}
+            onPress={handleLogout}
             activeOpacity={0.8}
           >
             <View style={localStyles.actionLeft}>
@@ -189,16 +248,15 @@ function SettingsScreen({navigation}) {
 
 export default SettingsScreen;
 
+/* ===================== STYLES ===================== */
+
 const localStyles = StyleSheet.create({
-  screen: {
-    alignItems: "center",
-  },
+  screen: { alignItems: "center" },
   content: {
     width: "100%",
     paddingHorizontal: 16,
     paddingBottom: 24,
   },
-
   section: {
     width: "100%",
     backgroundColor: ColorTheme.second,
@@ -210,7 +268,6 @@ const localStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: ColorTheme.fourth,
-    marginBottom: 4,
   },
   sectionSubtitle: {
     fontSize: 12,
@@ -218,7 +275,6 @@ const localStyles = StyleSheet.create({
     opacity: 0.8,
     marginBottom: 10,
   },
-
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -228,57 +284,24 @@ const localStyles = StyleSheet.create({
     borderTopColor: ColorTheme.fifth,
     marginTop: 4,
   },
-  rowLabel: {
-    fontSize: 13,
-    color: ColorTheme.fourth,
-    opacity: 0.9,
-  },
-  rowValue: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: ColorTheme.fourth,
-  },
-
+  rowLabel: { fontSize: 13, color: ColorTheme.fourth, opacity: 0.9 },
+  rowValue: { fontSize: 14, fontWeight: "600", color: ColorTheme.fourth },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 8,
-    marginTop: 4,
   },
-  toggleTextBlock: {
-    flex: 1,
-    paddingRight: 10,
-  },
-  toggleLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: ColorTheme.fourth,
-  },
-  toggleHint: {
-    fontSize: 11,
-    color: ColorTheme.fourth,
-    opacity: 0.75,
-    marginTop: 2,
-  },
-
+  toggleTextBlock: { flex: 1, paddingRight: 10 },
+  toggleLabel: { fontSize: 14, fontWeight: "600", color: ColorTheme.fourth },
+  toggleHint: { fontSize: 11, color: ColorTheme.fourth, opacity: 0.75 },
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 10,
-    marginTop: 4,
   },
-  actionLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  actionText: {
-    fontSize: 14,
-    color: ColorTheme.fourth,
-  },
-  logoutRow: {
-    marginTop: 8,
-  },
+  actionLeft: { flexDirection: "row", alignItems: "center", gap: 8 },
+  actionText: { fontSize: 14, color: ColorTheme.fourth },
+  logoutRow: { marginTop: 8 },
 });
