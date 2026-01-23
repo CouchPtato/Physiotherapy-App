@@ -1,11 +1,12 @@
 import { createStackNavigator } from "@react-navigation/stack";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import * as SecureStore from "expo-secure-store";
 import { View, ActivityIndicator } from "react-native";
 
 import LoginScreen from "./screens/LoginScreen.jsx";
 import MainScreen from "./screens/MainScreen.jsx";
 import ExerciseScreen from "./screens/ExerciseScreen.jsx";
+import { useTheme } from "../hooks/use-theme";
 
 const Stack = createStackNavigator();
 
@@ -34,6 +35,8 @@ function AuthLoading({ navigation }) {
 }
 
 function MyStack() {
+  const { isDarkMode } = useTheme();
+
   return (
     <Stack.Navigator
       initialRouteName="AuthLoading"

@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ColorTheme } from "../../constants/GlobalStyles.jsx";
+import { useTheme } from "../../hooks/use-theme";
 
 // ---- SAMPLE DATA ----
 const todaysAppointments = [
@@ -35,11 +36,11 @@ const requestAppointments = [
 
 // ---- SMALL COMPONENTS ----
 
-const SectionHeader = ({ title, count, subtitle }) => (
+const SectionHeader = ({ title, count, subtitle, dynamicColors }) => (
   <View style={styles.sectionHeader}>
     <View>
-      <Text style={styles.headingText}>{title}</Text>
-      {subtitle ? <Text style={styles.subHeadingText}>{subtitle}</Text> : null}
+      <Text style={[styles.headingText, { color: dynamicColors.text }]}>{title}</Text>
+      {subtitle ? <Text style={[styles.subHeadingText, { color: dynamicColors.textSecondary }]}>{subtitle}</Text> : null}
     </View>
     <View style={styles.countBadge}>
       <Text style={styles.countBadgeText}>{count}</Text>
@@ -47,16 +48,16 @@ const SectionHeader = ({ title, count, subtitle }) => (
   </View>
 );
 
-const AppointmentItem = ({ item, type }) => (
-  <View style={styles.itemContainer}>
+const AppointmentItem = ({ item, type, dynamicColors }) => (
+  <View style={[styles.itemContainer, { borderBottomColor: dynamicColors.border }]}>
     <View style={styles.itemLeft}>
-      <Text style={styles.itemName}>{item.name}</Text>
-      <Text style={styles.itemIdText}>#{item.id}</Text>
+      <Text style={[styles.itemName, { color: dynamicColors.text }]}>{item.name}</Text>
+      <Text style={[styles.itemIdText, { color: dynamicColors.textSecondary }]}>#{item.id}</Text>
     </View>
 
     <View style={styles.itemRight}>
-      <Text style={styles.itemDateText}>{item.date}</Text>
-      <Text style={styles.itemTimeText}>{item.time}</Text>
+      <Text style={[styles.itemDateText, { color: dynamicColors.text }]}>{item.date}</Text>
+      <Text style={[styles.itemTimeText, { color: dynamicColors.textSecondary }]}>{item.time}</Text>
     </View>
 
     {type === "requests" && (
@@ -86,11 +87,11 @@ const AppointmentItem = ({ item, type }) => (
   </View>
 );
 
-const AppointmentsList = ({ data, type }) => {
+const AppointmentsList = ({ data, type, dynamicColors }) => {
   if (!data || data.length === 0) {
     return (
       <View style={styles.emptyStateContainer}>
-        <Text style={styles.emptyStateText}>No appointments.</Text>
+        <Text style={[styles.emptyStateText, { color: dynamicColors.textSecondary }]}>No appointments.</Text>
       </View>
     );
   }
@@ -98,7 +99,7 @@ const AppointmentsList = ({ data, type }) => {
   return (
     <FlatList
       data={data}
-      renderItem={({ item }) => <AppointmentItem item={item} type={type} />}
+      renderItem={({ item }) => <AppointmentItem item={item} type={type} dynamicColors={dynamicColors} />}
       keyExtractor={(item) => item.id.toString()}
       ItemSeparatorComponent={() => <View style={styles.itemSeparator} />}
       contentContainerStyle={{ paddingVertical: 4 }}
@@ -110,41 +111,54 @@ const AppointmentsList = ({ data, type }) => {
 // ---- MAIN SCREEN ----
 
 function AppointmentsScreen() {
+  const { isDarkMode } = useTheme();
+  
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
+
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView style={[styles.screen, { backgroundColor: dynamicColors.containerBg }]}>
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* TODAY'S APPOINTMENTS */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
           <SectionHeader
             title="Today's Appointments"
             count={todaysAppointments.length}
             subtitle="Patients scheduled for today"
+            dynamicColors={dynamicColors}
           />
-          <AppointmentsList data={todaysAppointments} type="today" />
+          <AppointmentsList data={todaysAppointments} type="today" dynamicColors={dynamicColors} />
         </View>
 
         {/* UPCOMING APPOINTMENTS */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
           <SectionHeader
             title="Upcoming Appointments"
             count={upcomingAppointments.length}
             subtitle="Next sessions in your calendar"
+            dynamicColors={dynamicColors}
           />
-          <AppointmentsList data={upcomingAppointments} type="upcoming" />
+          <AppointmentsList data={upcomingAppointments} type="upcoming" dynamicColors={dynamicColors} />
         </View>
 
         {/* REQUESTS */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
           <SectionHeader
             title="Requests"
             count={requestAppointments.length}
             subtitle="Pending approval from patients"
+            dynamicColors={dynamicColors}
           />
-          <AppointmentsList data={requestAppointments} type="requests" />
+          <AppointmentsList data={requestAppointments} type="requests" dynamicColors={dynamicColors} />
         </View>
       </ScrollView>
     </SafeAreaView>

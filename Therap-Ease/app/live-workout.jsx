@@ -7,6 +7,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { usePoseStore } from "../hooks/use-pose-store";
 import { PoseSkiaOverlay } from "../components/pose/PoseSkiaOverlay";
+import { useTheme } from "../hooks/use-theme";
 
 import { API_BASE } from "../constants/api";
 
@@ -27,6 +28,7 @@ const COLORS = {
 export default function LiveWorkoutScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isDarkMode } = useTheme();
 
   const exerciseKey = params.exerciseKey || "squat";
   const exerciseName = params.name || exerciseKey;
@@ -34,6 +36,14 @@ export default function LiveWorkoutScreen() {
   const totalSets = Number(params.sets || 1);
   const patientName = params.patientName || "Somay Singh";
   const patientId = params.patientId || "P-2025-001";
+
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
 
   const cameraRef = useRef(null);
   const frameTimerRef = useRef(null);
@@ -222,7 +232,7 @@ export default function LiveWorkoutScreen() {
   const progressPercentage = (repsThisSet / repsTarget) * 100;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: dynamicColors.containerBg }]}>
       {!workoutEnded && (
         <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
       )}
@@ -230,7 +240,7 @@ export default function LiveWorkoutScreen() {
       <PoseSkiaOverlay keypointsSV={keypointsSV} />
 
       {/* Header Controls */}
-      <View style={styles.headerControls}>
+      <View style={[styles.headerControls, { backgroundColor: `rgba(0,0,0,0.5)` }]}>
         <TouchableOpacity style={styles.controlBtn} onPress={goBack}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>

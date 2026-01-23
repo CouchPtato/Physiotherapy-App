@@ -12,6 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import { useTheme } from "../../hooks/use-theme";
 
 const SAMPLE = [
   {
@@ -149,10 +150,20 @@ function initials(name = "") {
 
 export default function PatientsScreen() {
   const router = useRouter();
+  const { isDarkMode } = useTheme();
   const [patients, setPatients] = useState(SAMPLE);
   const [query, setQuery] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+    inputBg: isDarkMode ? "#111827" : "#F3F4F6",
+  };
 
   useEffect(() => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -204,7 +215,7 @@ export default function PatientsScreen() {
     }, 800);
   };
 
-  const renderItem = ({ item }) => {
+  const renderItem = ({ item }, dynamicColors) => {
     const expanded = expandedId === item.id;
     const exercises = item.exercises || [];
 
@@ -212,7 +223,7 @@ export default function PatientsScreen() {
       <TouchableOpacity
         activeOpacity={0.9}
         onPress={() => toggleExpand(item.id)}
-        style={[stylesLocal.card, expanded ? stylesLocal.cardExpanded : null]}
+        style={[stylesLocal.card, { backgroundColor: dynamicColors.cardBg, borderColor: dynamicColors.border }, expanded ? stylesLocal.cardExpanded : null]}
       >
         <View style={stylesLocal.row}>
           <View style={stylesLocal.avatar}>
@@ -220,8 +231,8 @@ export default function PatientsScreen() {
           </View>
 
           <View style={{ flex: 1 }}>
-            <Text style={stylesLocal.name}>{item.name}</Text>
-            <Text style={stylesLocal.meta}>
+            <Text style={[stylesLocal.name, { color: dynamicColors.text }]}>{item.name}</Text>
+            <Text style={[stylesLocal.meta, { color: dynamicColors.textSecondary }]}>
               {item.age} yrs • {item.gender} • {item.city}
             </Text>
 
@@ -229,7 +240,7 @@ export default function PatientsScreen() {
               <Text
                 style={[
                   stylesLocal.meta,
-                  { marginTop: 2, fontSize: 12, color: "#4b5563" },
+                  { marginTop: 2, fontSize: 12, color: dynamicColors.textSecondary },
                 ]}
               >
                 {exercises.length} prescribed exercise
@@ -239,13 +250,13 @@ export default function PatientsScreen() {
           </View>
 
           <View style={{ width: 50, alignItems: "flex-end" }}>
-            <Text style={stylesLocal.chev}>{expanded ? "▲" : "▼"}</Text>
+            <Text style={[stylesLocal.chev, { color: dynamicColors.text }]}>{expanded ? "▲" : "▼"}</Text>
           </View>
         </View>
 
         {expanded && (
           <View style={stylesLocal.expanded}>
-            <Text style={stylesLocal.info}>
+            <Text style={[stylesLocal.info, { color: dynamicColors.text }]}>
               Notes: {item.notes || "No notes"}
             </Text>
 
@@ -295,13 +306,13 @@ export default function PatientsScreen() {
   };
 
   return (
-    <SafeAreaView style={stylesLocal.container}>
-      <View style={stylesLocal.header}>
-        <Text style={stylesLocal.title}>Patients</Text>
+    <SafeAreaView style={[stylesLocal.container, { backgroundColor: dynamicColors.containerBg }]}>
+      <View style={[stylesLocal.header, { backgroundColor: dynamicColors.cardBg }]}>
+        <Text style={[stylesLocal.title, { color: dynamicColors.text }]}>Patients</Text>
 
         <View style={stylesLocal.headerRight}>
           <TouchableOpacity style={stylesLocal.addBtn}>
-            <Text style={stylesLocal.addText}>+    Add</Text>
+            <Text style={[stylesLocal.addText, { color: dynamicColors.text }]}>+    Add</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -311,15 +322,16 @@ export default function PatientsScreen() {
           value={query}
           onChangeText={setQuery}
           placeholder="Search name, city or age..."
-          style={stylesLocal.search}
+          style={[stylesLocal.search, { backgroundColor: dynamicColors.inputBg, color: dynamicColors.text, borderColor: dynamicColors.border }]}
           clearButtonMode="while-editing"
+          placeholderTextColor={dynamicColors.textSecondary}
         />
       </View>
 
       <FlatList
         data={filtered}
         keyExtractor={(i) => i.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => renderItem({ item }, dynamicColors)}
         contentContainerStyle={{ paddingBottom: 40, paddingTop: 6 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -327,7 +339,7 @@ export default function PatientsScreen() {
         }
         ListEmptyComponent={
           <View style={{ padding: 24, alignItems: "center" }}>
-            <Text style={{ color: "#666" }}>No patients match your search.</Text>
+            <Text style={{ color: dynamicColors.textSecondary }}>No patients match your search.</Text>
           </View>
         }
       />

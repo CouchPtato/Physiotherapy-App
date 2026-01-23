@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import ProfileCard from "../../components/ProfileCard.jsx";
 import { ColorTheme } from "../../constants/GlobalStyles.jsx";
+import { useTheme } from "../../hooks/use-theme";
 
 const styles = StyleSheet.create({
   screen: {
@@ -89,6 +90,17 @@ function SearchScreen() {
   const [filtered, setFiltered] = useState([]);
   const [notFound, setNotFound] = useState(true);
 
+  const { isDarkMode } = useTheme();
+  
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    inputBg: isDarkMode ? "#111827" : ColorTheme.second,
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
+
   const handleSearch = (text) => {
   setQuery(text);
 
@@ -124,26 +136,26 @@ function SearchScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: dynamicColors.containerBg }]}>
       <TextInput
-        style={styles.searchBox}
+        style={[styles.searchBox, { backgroundColor: dynamicColors.inputBg, color: dynamicColors.text, borderColor: dynamicColors.border, borderWidth: 1 }]}
         placeholder="Search name..."
-        placeholderTextColor={ColorTheme.fourth}
+        placeholderTextColor={dynamicColors.textSecondary}
         value={query}
         onChangeText={handleSearch}
       />
 
       {filtered.length > 0 && (
-        <View style={styles.suggestionBox}>
+        <View style={[styles.suggestionBox, { backgroundColor: dynamicColors.cardBg, borderColor: dynamicColors.border, borderWidth: 1 }]}>
           <FlatList
             data={filtered}
             keyExtractor={(item) => item.id.toString()}
             renderItem={({ item }) => (
               <TouchableOpacity
-                style={styles.suggestionItem}
+                style={[styles.suggestionItem, { borderBottomColor: dynamicColors.border }]}
                 onPress={() => handleSelect(item.name)}
               >
-                <Text style={styles.suggestionText}>
+                <Text style={[styles.suggestionText, { color: dynamicColors.text }]}>
                   {item.name} (#{item.id} - {item.role})
                 </Text>
               </TouchableOpacity>

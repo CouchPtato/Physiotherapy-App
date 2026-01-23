@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import img1 from '../../assets/images/banner1.png';
 import img2 from '../../assets/images/banner2.png';
 import { ColorTheme } from "../../constants/GlobalStyles.jsx";
+import { useTheme } from "../../hooks/use-theme";
 
 const fetchAppointments = () => {
   // MAX, UPCOMING 3
@@ -31,7 +32,7 @@ const styles = StyleSheet.create({
     backgroundColor: ColorTheme.first,
     justifyContent: "flex-start",
     alignItems: "center",
-    paddingTop: 10,
+    paddingTop: 5,
   },
 
   text: {
@@ -51,13 +52,16 @@ const styles = StyleSheet.create({
     marginTop: 0,
     color: "white",
   },
+
   card: {
     width: "95%",
-    height: "19%",
-    marginTop: "3%",
+    height: "12%",
+    marginTop: "2.5%",
     backgroundColor: ColorTheme.fourth,
     borderRadius: 10,
     shadowColor: "#000",
+    // paddingVertical: 15,
+    // paddingHorizontal: 15,
   },
 
   scheduleOuter: {
@@ -96,6 +100,28 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "black",
   },
+  exerciseRow: {
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  exerciseRectangle: {
+    width: "48%",
+    backgroundColor: ColorTheme.first,
+    borderRadius: 10,
+    padding: 15,
+    justifyContent: "center",
+    elevation: 3,
+  },
+  exerciseTitle: {
+    fontSize: 14,
+    color: ColorTheme.fourth,
+    fontWeight: "bold",
+    marginBottom: 5,
+  },
+  exerciseSub: {
+    fontSize: 12,
+    color: ColorTheme.fifth,
+  },
   graph: {
     width: '95%',
     height: '75%',
@@ -103,21 +129,23 @@ const styles = StyleSheet.create({
   }
 });
 
-function SecondCard({ role }) {
+function SecondCard({ role, dynamicColors }) {
   if (role === "patient") {
     return (
       <View
         style={[
           styles.card,
           {
-            backgroundColor: ColorTheme.fifth,
-            height: "50%",
+            backgroundColor: dynamicColors.cardBg,
+            height: "60%",
             alignItems: "center",
-            padding: "3%",
+            paddingBottom: "1%",
+            // padding: "1%",
+            justifyContent: "center"
           },
         ]}
       >
-        <Text style={[styles.text2, { color: ColorTheme.first }]}>
+        <Text style={[styles.text2, { color: dynamicColors.text }]}>
           Recommended Articles
         </Text>
 
@@ -159,14 +187,14 @@ function SecondCard({ role }) {
         style={[
           styles.card,
           {
-            backgroundColor: ColorTheme.fifth,
+            backgroundColor: dynamicColors.cardBg,
             height: "45%",
             alignItems: "center",
             padding: 10,
           },
         ]}
       >
-        <Text style={[styles.text2, { color: ColorTheme.first }]}>
+        <Text style={[styles.text2, { color: dynamicColors.text }]}>
           Upcoming Appointments
         </Text>
         <View
@@ -296,9 +324,10 @@ function ThirdCard({ role }) {
           styles.card,
           {
             backgroundColor: ColorTheme.fourth,
-            height: "31%",
-            alignItems: "center",
+            height: "24%",
             padding: "2%",
+            borderBottomWidth: 2,
+            borderBottomColor: ColorTheme.fifth,
           },
         ]}
       >
@@ -306,22 +335,25 @@ function ThirdCard({ role }) {
           Today&apos;s Exercises
         </Text>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scheduleScroll}
-        >
-          {items.map((it) => (
+        <FlatList
+          data={items}
+          numColumns={2}
+          scrollEnabled={true}
+          showsVerticalScrollIndicator={true}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item: it }) => (
             <TouchableOpacity
-              key={it.id}
-              style={styles.smallCard}
-              onPress={() => handleOpenExercise(it)} // ✅ open tracking flow
+              style={styles.exerciseRectangle}
+              onPress={() => handleOpenExercise(it)}
             >
-              <Text style={styles.smallCardTitle}>{it.title}</Text>
-              <Text style={styles.smallCardSub}>{it.sub}</Text>
+              <Text style={styles.exerciseTitle}>{it.title}</Text>
+              <Text style={styles.exerciseSub}>{it.sub}</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          )}
+          columnWrapperStyle={styles.exerciseRow}
+          contentContainerStyle={{ paddingBottom: 8 }}
+          scrollEventThrottle={16}
+        />
       </View>
     );
   } else {
@@ -349,11 +381,11 @@ function ThirdCard({ role }) {
   }
 }
 
-function UserCard({ username, role }) {
+function UserCard({ username, role, dynamicColors }) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.text}>Hello,</Text>
-      <Text style={[styles.text, styles.username]}>
+    <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
+      <Text style={[styles.text, { color: dynamicColors.text }]}>Hello,</Text>
+      <Text style={[styles.text, styles.username, { color: dynamicColors.text }]}>
         {role === "doctor" ? `Dr. ${username}` : username}
       </Text>
     </View>
@@ -361,11 +393,21 @@ function UserCard({ username, role }) {
 }
 
 function HomeScreen({ role }) {
+  const { isDarkMode } = useTheme();
+  
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
+
   return (
-    <SafeAreaView style={styles.screen}>
-      <UserCard username="ABC XYZ" role={role} />
-      <SecondCard role={role} />
-      <ThirdCard role={role} />
+    <SafeAreaView style={[styles.screen, { backgroundColor: dynamicColors.containerBg }]}>
+      <UserCard username="ABC XYZ" role={role} dynamicColors={dynamicColors} />
+      <SecondCard role={role} dynamicColors={dynamicColors} />
+      <ThirdCard role={role} dynamicColors={dynamicColors} />
     </SafeAreaView>
   );
 }

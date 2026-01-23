@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Ionicons from "react-native-vector-icons/Ionicons";
 import { ColorTheme } from "../../constants/GlobalStyles";
+import { useTheme } from "../../hooks/use-theme";
 
 //tutorial URL
 const EXERCISE_TUTORIALS = {
@@ -89,31 +90,41 @@ const ExerciseScreen = (props) => {
 
   const tutorialAvailable = !!tutorialUrl;
 
+  const { isDarkMode } = useTheme();
+  
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: dynamicColors.containerBg }]}>
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerWrapper}>
+        <View style={[styles.headerWrapper, { backgroundColor: dynamicColors.cardBg }]}>
           <View style={styles.headerBadge}>
             <Ionicons
               name="fitness-outline"
               size={18}
-              color={ColorTheme.first}
+              color={dynamicColors.text}
             />
-            <Text style={styles.headerBadgeText}>Exercise Session</Text>
+            <Text style={[styles.headerBadgeText, { color: dynamicColors.text }]}>Exercise Session</Text>
           </View>
-          <Text style={styles.headerTitle}>All the best!</Text>
-          <Text style={styles.headerSubtitle}>
+          <Text style={[styles.headerTitle, { color: dynamicColors.text }]}>All the best!</Text>
+          <Text style={[styles.headerSubtitle, { color: dynamicColors.textSecondary }]}>
             Complete your exercise and either track it live or upload a short
             video for your doctor.
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Live Tracking</Text>
-          <Text style={styles.sectionSubtitle}>
+        <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
+          <Text style={[styles.sectionTitle, { color: dynamicColors.text }]}>Live Tracking</Text>
+          <Text style={[styles.sectionSubtitle, { color: dynamicColors.textSecondary }]}>
             Use your phone camera to track your reps, angles and form in real
             time.
           </Text>
@@ -122,16 +133,16 @@ const ExerciseScreen = (props) => {
             <Ionicons
               name="walk-outline"
               size={20}
-              color={ColorTheme.first}
+              color={dynamicColors.text}
               style={{ marginRight: 8 }}
             />
-            <Text style={styles.liveButtonText}>Start Live Session</Text>
+            <Text style={[styles.liveButtonText, { color: dynamicColors.text }]}>Start Live Session</Text>
           </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Exercise Video</Text>
-          <Text style={styles.sectionSubtitle}>
+        <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
+          <Text style={[styles.sectionTitle, { color: dynamicColors.text }]}>Exercise Video</Text>
+          <Text style={[styles.sectionSubtitle, { color: dynamicColors.textSecondary }]}>
             Upload a video of you performing this exercise so your doctor can
             review your form and metrics.
           </Text>
@@ -144,7 +155,7 @@ const ExerciseScreen = (props) => {
               <Ionicons
                 name="cloud-upload-outline"
                 size={22}
-                color={ColorTheme.fourth}
+                color={dynamicColors.text}
               />
             </View>
             <View>

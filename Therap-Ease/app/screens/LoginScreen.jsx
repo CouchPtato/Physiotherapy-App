@@ -17,6 +17,7 @@ import * as SecureStore from "expo-secure-store";
 import logoimg from "../../assets/images/logo.png";
 import { ColorTheme, styles } from "../../constants/GlobalStyles.jsx";
 import { LOGIN_API, REGISTER_API } from "../../constants/api";
+import { useTheme } from "../../hooks/use-theme";
 
 /* ===================== VALIDATION ===================== */
 
@@ -138,9 +139,20 @@ const LoginScreen = ({ navigation }) => {
 
   /* ===================== UI ===================== */
 
+  const { isDarkMode } = useTheme();
+  
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    headerBg: isDarkMode ? "#111827" : "#fff",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, justifyContent: "center" }}>
-      <View style={styles.container}>
+    <SafeAreaView style={[{ flex: 1, justifyContent: "center" }, { backgroundColor: dynamicColors.containerBg }]}>
+      <View style={[styles.container, { backgroundColor: dynamicColors.containerBg }]}>
         <Image source={logoimg} style={styles.logo} />
 
         {/* REGISTER BUTTON */}

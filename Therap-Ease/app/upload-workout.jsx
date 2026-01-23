@@ -15,6 +15,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../hooks/use-theme";
 
 // Colors
 const COLORS = {
@@ -30,6 +31,7 @@ const COLORS = {
 export default function UploadWorkoutScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
+  const { isDarkMode } = useTheme();
 
   const exerciseKey = params.exerciseKey || "squat";
   const name = params.name || "Squats";
@@ -38,6 +40,15 @@ export default function UploadWorkoutScreen() {
   const doctor = params.doctor || "Dr. Sharma";
   const patientName = params.patientName || "";
   const patientId = params.patientId || "";
+
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    inputBg: isDarkMode ? "#111827" : "#F3F4F6",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
 
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [processedVideoUri, setProcessedVideoUri] = useState(null);
@@ -193,7 +204,7 @@ export default function UploadWorkoutScreen() {
   const isReady = analysisData && processedVideoUri;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: dynamicColors.containerBg }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
@@ -370,15 +381,18 @@ export default function UploadWorkoutScreen() {
 }
 
 // Stat Card Component
-const StatCard = ({ label, value, unit }) => (
-  <View style={styles.statCard}>
-    <Text style={styles.statLabel}>{label}</Text>
-    <View style={styles.statValue}>
-      <Text style={styles.statNumber}>{value}</Text>
-      {unit && <Text style={styles.statUnit}>{unit}</Text>}
+const StatCard = ({ label, value, unit, dynamicColors }) => {
+  const colors = dynamicColors || { text: COLORS.dark, inputBg: "#f3f4f6" };
+  return (
+    <View style={[styles.statCard, { backgroundColor: colors.inputBg }]}>
+      <Text style={[styles.statLabel, { color: colors.text }]}>{label}</Text>
+      <View style={styles.statValue}>
+        <Text style={[styles.statNumber, { color: colors.text }]}>{value}</Text>
+        {unit && <Text style={[styles.statUnit, { color: colors.textSecondary }]}>{unit}</Text>}
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   container: {

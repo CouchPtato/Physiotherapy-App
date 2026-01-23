@@ -20,18 +20,29 @@ import {
   ColorTheme,
   styles as globalStyles,
 } from "../../constants/GlobalStyles.jsx";
+import { useTheme } from "../../hooks/use-theme";
 
 function SettingsScreen() {
   const navigation = useNavigation();
+  const { isDarkMode, setIsDarkMode } = useTheme();
 
   /* ===================== STATE ===================== */
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
   const [location, setLocation] = useState(false);
   const [autoUpdates, setAutoUpdates] = useState(true);
 
   const [role, setRole] = useState("-");
   const [email, setEmail] = useState("-");
+
+  // Dynamic colors based on theme
+  const dynamicColors = {
+    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    headerBg: isDarkMode ? "#111827" : "#fff",
+    cardBg: isDarkMode ? "#1F2937" : "#fff",
+    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
+    border: isDarkMode ? "#374151" : "#E5E7EB",
+  };
 
   /* ===================== LOAD USER ===================== */
   useEffect(() => {
@@ -81,23 +92,23 @@ function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={[globalStyles.screen, localStyles.screen]}>
+    <SafeAreaView style={[globalStyles.screen, localStyles.screen, { backgroundColor: dynamicColors.containerBg }]}>
       <ScrollView
         style={{ width: "100%" }}
         contentContainerStyle={localStyles.content}
         showsVerticalScrollIndicator={false}
       >
         {/* ===================== ACCOUNT ===================== */}
-        <View style={localStyles.section}>
-          <Text style={localStyles.sectionTitle}>Account Overview</Text>
-          <Text style={localStyles.sectionSubtitle}>
+        <View style={[localStyles.section, { backgroundColor: dynamicColors.cardBg, borderColor: dynamicColors.border }]}>
+          <Text style={[localStyles.sectionTitle, { color: dynamicColors.text }]}>Account Overview</Text>
+          <Text style={[localStyles.sectionSubtitle, { color: dynamicColors.textSecondary }]}>
             Manage your profile, security, and app preferences.
           </Text>
 
-          <View style={localStyles.row}>
+          <View style={[localStyles.row, { borderBottomColor: dynamicColors.border }]}>
             <View>
-              <Text style={localStyles.rowLabel}>Account Type</Text>
-              <Text style={localStyles.rowValue}>
+              <Text style={[localStyles.rowLabel, { color: dynamicColors.textSecondary }]}>Account Type</Text>
+              <Text style={[localStyles.rowValue, { color: dynamicColors.text }]}>
                 {role === "doctor" ? "Doctor" : "Patient"}
               </Text>
             </View>
@@ -110,8 +121,8 @@ function SettingsScreen() {
 
           <View style={localStyles.row}>
             <View>
-              <Text style={localStyles.rowLabel}>Email</Text>
-              <Text style={localStyles.rowValue}>{email}</Text>
+              <Text style={[localStyles.rowLabel, { color: dynamicColors.textSecondary }]}>Email</Text>
+              <Text style={[localStyles.rowValue, { color: dynamicColors.text }]}>{email}</Text>
             </View>
             <Ionicons
               name="mail-outline"
@@ -122,11 +133,11 @@ function SettingsScreen() {
         </View>
 
         {/* ===================== PREFERENCES ===================== */}
-        <View style={localStyles.section}>
-          <Text style={localStyles.sectionTitle}>Preferences</Text>
+        <View style={[localStyles.section, { backgroundColor: dynamicColors.cardBg, borderColor: dynamicColors.border }]}>
+          <Text style={[localStyles.sectionTitle, { color: dynamicColors.text }]}>Preferences</Text>
 
-          <View style={localStyles.toggleRow}>
-            <Text style={localStyles.toggleLabel}>Notifications</Text>
+          <View style={[localStyles.toggleRow, { borderBottomColor: dynamicColors.border }]}>
+            <Text style={[localStyles.toggleLabel, { color: dynamicColors.text }]}>Notifications</Text>
             <Switch
               value={notifications}
               onValueChange={setNotifications}
@@ -136,17 +147,17 @@ function SettingsScreen() {
           </View>
 
           <View style={localStyles.toggleRow}>
-            <Text style={localStyles.toggleLabel}>Dark Mode</Text>
+            <Text style={[localStyles.toggleLabel, { color: dynamicColors.text }]}>Dark Mode</Text>
             <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
+              value={isDarkMode}
+              onValueChange={setIsDarkMode}
               thumbColor={ColorTheme.fourth}
               trackColor={{ true: ColorTheme.fifth }}
             />
           </View>
 
-          <View style={localStyles.toggleRow}>
-            <Text style={localStyles.toggleLabel}>Location Services</Text>
+          <View style={[localStyles.toggleRow, { borderBottomColor: dynamicColors.border }]}>
+            <Text style={[localStyles.toggleLabel, { color: dynamicColors.text }]}>Location Services</Text>
             <Switch
               value={location}
               onValueChange={setLocation}
@@ -156,7 +167,7 @@ function SettingsScreen() {
           </View>
 
           <View style={localStyles.toggleRow}>
-            <Text style={localStyles.toggleLabel}>Auto Updates</Text>
+            <Text style={[localStyles.toggleLabel, { color: dynamicColors.text }]}>Auto Updates</Text>
             <Switch
               value={autoUpdates}
               onValueChange={setAutoUpdates}
@@ -167,14 +178,14 @@ function SettingsScreen() {
         </View>
 
         {/* ===================== LOGOUT ===================== */}
-        <View style={localStyles.section}>
+        <View style={[localStyles.section, { backgroundColor: dynamicColors.cardBg, borderColor: dynamicColors.border }]}>
           <TouchableOpacity
             style={localStyles.logoutRow}
             onPress={handleLogout}
             activeOpacity={0.8}
           >
             <Ionicons name="log-out-outline" size={22} color="#ff6b6b" />
-            <Text style={localStyles.logoutText}>Log Out</Text>
+            <Text style={[localStyles.logoutText, { color: dynamicColors.text }]}>Log Out</Text>
           </TouchableOpacity>
         </View>
 
@@ -201,6 +212,8 @@ const localStyles = StyleSheet.create({
     borderRadius: 12,
     padding: 14,
     marginTop: 16,
+    borderWidth: 1,
+    borderColor: ColorTheme.second,
   },
   sectionTitle: {
     fontSize: 16,
@@ -217,18 +230,22 @@ const localStyles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 6,
+    paddingVertical: 12,
     marginTop: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: ColorTheme.second,
   },
-  rowLabel: { fontSize: 13, color: ColorTheme.fourth },
-  rowValue: { fontSize: 14, fontWeight: "600", color: ColorTheme.fourth },
+  rowLabel: { fontSize: 13, color: ColorTheme.muted },
+  rowValue: { fontSize: 14, fontWeight: "600", color: ColorTheme.dark },
   toggleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: ColorTheme.second,
   },
-  toggleLabel: { fontSize: 14, color: ColorTheme.fourth },
+  toggleLabel: { fontSize: 14, color: ColorTheme.dark, fontWeight: "500" },
   logoutRow: {
     flexDirection: "row",
     alignItems: "center",
