@@ -8,7 +8,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { usePoseStore } from "../hooks/use-pose-store";
 import { PoseSkiaOverlay } from "../components/pose/PoseSkiaOverlay";
 
-/* ✅ COMMON API BASE */
 import { API_BASE } from "../constants/api";
 
 const FRAME_INTERVAL = 300;

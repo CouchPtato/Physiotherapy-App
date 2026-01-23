@@ -1,5 +1,6 @@
 // CHANGE THIS IP WHEN NETWORK CHANGES
-export const BASE_URL = "http://10.229.220.100:8000";
+export const BASE_URL = "http://192.168.1.4:8000";
+export const API_BASE = BASE_URL;
 
 // Auth
 export const LOGIN_API = `${BASE_URL}/login`;
