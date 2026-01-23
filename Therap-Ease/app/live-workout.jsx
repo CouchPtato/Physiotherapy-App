@@ -1,7 +1,7 @@
 import { CameraView } from "expo-camera";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Text, View, TouchableOpacity, Linking } from "react-native";
+import { Text, View, TouchableOpacity, Linking, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -12,6 +12,17 @@ import { API_BASE } from "../constants/api";
 
 const FRAME_INTERVAL = 300;
 const MOTION_TIMEOUT_MS = 800;
+
+// Colors
+const COLORS = {
+  primary: "#6366f1",
+  success: "#10b981",
+  warning: "#f59e0b",
+  danger: "#ef4444",
+  dark: "#1f2937",
+  light: "#f9fafb",
+  muted: "#6b7280",
+};
 
 export default function LiveWorkoutScreen() {
   const router = useRouter();
@@ -28,42 +39,29 @@ export default function LiveWorkoutScreen() {
   const frameTimerRef = useRef(null);
   const stoppedRef = useRef(false);
 
-  /* ---------------- UI STATE ---------------- */
-
   const [facing, setFacing] = useState("front");
   const [currentSet, setCurrentSet] = useState(1);
   const [repsThisSet, setRepsThisSet] = useState(0);
   const [totalReps, setTotalReps] = useState(0);
   const [angleUI, setAngleUI] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-
   const [running, setRunning] = useState(true);
-  const [setCompleted, setSetCompleted] = useState(false);
   const [workoutEnded, setWorkoutEnded] = useState(false);
-
   const [pdfUrl, setPdfUrl] = useState(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
-
-  /* ---------------- MOTION STATE ---------------- */
 
   const lastPoseTsRef = useRef(0);
   const [motionUI, setMotionUI] = useState(false);
 
-  /* ---------------- FORM SCORE ---------------- */
-
   const totalFormScoreRef = useRef(0);
   const formFrameCountRef = useRef(0);
-
-  /* ---------------- REP CALLBACK ---------------- */
 
   const onRep = () => {
     setRepsThisSet((r) => {
       const next = r + 1;
       setTotalReps((t) => t + 1);
-
       if (next >= repsTarget) {
         setRunning(false);
-        setSetCompleted(true);
         if (currentSet >= totalSets) {
           setWorkoutEnded(true);
         }
@@ -72,16 +70,7 @@ export default function LiveWorkoutScreen() {
     });
   };
 
-  /* ---------------- POSE ENGINE ---------------- */
-
-  const {
-    processFrame,
-    angleSV,
-    keypointsSV,
-    lastFormScoreRef,
-  } = usePoseStore(exerciseKey, onRep);
-
-  /* ---------------- ANGLE UI ---------------- */
+  const { processFrame, angleSV, keypointsSV, lastFormScoreRef } = usePoseStore(exerciseKey, onRep);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -90,19 +79,14 @@ export default function LiveWorkoutScreen() {
     return () => clearInterval(id);
   }, []);
 
-  /* ---------------- TIMER ---------------- */
-
   useEffect(() => {
     if (!running) return;
     const id = setInterval(() => setElapsed((t) => t + 1), 1000);
     return () => clearInterval(id);
   }, [running]);
 
-  /* ---------------- FRAME LOOP ---------------- */
-
   const captureFrame = async () => {
     if (!cameraRef.current || !running || stoppedRef.current) return;
-
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
@@ -132,31 +116,24 @@ export default function LiveWorkoutScreen() {
           totalFormScoreRef.current += lastFormScoreRef.current;
           formFrameCountRef.current += 1;
         }
-      } else if (
-        Date.now() - lastPoseTsRef.current > MOTION_TIMEOUT_MS
-      ) {
+      } else if (Date.now() - lastPoseTsRef.current > MOTION_TIMEOUT_MS) {
         setMotionUI(false);
       }
     } catch {
-      // ignore dropped frames
+      // Ignore dropped frames
     }
   };
 
   useEffect(() => {
     if (!running || workoutEnded) return;
-
     frameTimerRef.current = setInterval(captureFrame, FRAME_INTERVAL);
-
     return () => {
       clearInterval(frameTimerRef.current);
       frameTimerRef.current = null;
     };
   }, [running, workoutEnded]);
 
-  /* ---------------- ACTIONS ---------------- */
-
-  const toggleCamera = () =>
-    setFacing((f) => (f === "front" ? "back" : "front"));
+  const toggleCamera = () => setFacing((f) => (f === "front" ? "back" : "front"));
 
   const hardStopCamera = () => {
     stoppedRef.current = true;
@@ -170,13 +147,11 @@ export default function LiveWorkoutScreen() {
     hardStopCamera();
     setRunning(false);
     setWorkoutEnded(true);
-    setSetCompleted(false);
   };
 
   const startNextSet = () => {
     setCurrentSet((s) => s + 1);
     setRepsThisSet(0);
-    setSetCompleted(false);
     setRunning(true);
     stoppedRef.current = false;
   };
@@ -225,7 +200,6 @@ export default function LiveWorkoutScreen() {
     setElapsed(0);
     setRunning(true);
     setWorkoutEnded(false);
-    setSetCompleted(false);
     setPdfUrl(null);
     setMotionUI(false);
 
@@ -239,140 +213,330 @@ export default function LiveWorkoutScreen() {
     router.back();
   };
 
-  /* ---------------- UI ---------------- */
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const progressPercentage = (repsThisSet / repsTarget) * 100;
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }}>
+    <SafeAreaView style={styles.container}>
       {!workoutEnded && (
-        <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} />
+        <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
       )}
 
       <PoseSkiaOverlay keypointsSV={keypointsSV} />
 
-      <TouchableOpacity onPress={goBack} style={btn({ left: 20 })}>
-        <Ionicons name="chevron-back" size={22} color="#fff" />
-      </TouchableOpacity>
+      {/* Header Controls */}
+      <View style={styles.headerControls}>
+        <TouchableOpacity style={styles.controlBtn} onPress={goBack}>
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.controlBtn} onPress={toggleCamera}>
+          <Ionicons name="camera-reverse" size={20} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
-      <TouchableOpacity onPress={toggleCamera} style={btn({ right: 20 })}>
-        <Ionicons name="camera-reverse" size={22} color="#fff" />
-      </TouchableOpacity>
+      {/* Stats Overlay */}
+      <View style={styles.statsOverlay}>
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Set</Text>
+          <Text style={styles.statValue}>
+            {currentSet}/{totalSets}
+          </Text>
+        </View>
 
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Reps</Text>
+          <Text style={styles.statValue}>
+            {repsThisSet}/{repsTarget}
+          </Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Time</Text>
+          <Text style={styles.statValue}>{formatTime(elapsed)}</Text>
+        </View>
+
+        <View style={styles.statCard}>
+          <Text style={styles.statLabel}>Angle</Text>
+          <Text style={styles.statValue}>{angleUI}°</Text>
+        </View>
+      </View>
+
+      {/* Progress Bar */}
+      <View style={styles.progressContainer}>
+        <View style={styles.progressBar}>
+          <View style={[styles.progressFill, { width: `${progressPercentage}%` }]} />
+        </View>
+      </View>
+
+      {/* Motion Status */}
+      <View style={styles.motionStatus}>
+        <View style={[styles.motionIndicator, { backgroundColor: motionUI ? COLORS.success : COLORS.muted }]} />
+        <Text style={styles.motionText}>{motionUI ? "Motion Detected" : "No Motion"}</Text>
+      </View>
+
+      {/* End Workout Button */}
       {!workoutEnded && (
-        <TouchableOpacity onPress={endWorkout} style={endBtn}>
-          <Text style={{ fontWeight: "700" }}>End</Text>
+        <TouchableOpacity style={styles.endBtn} onPress={endWorkout}>
+          <Ionicons name="stop-circle" size={20} color="#fff" />
+          <Text style={styles.endBtnText}>End Workout</Text>
         </TouchableOpacity>
       )}
 
-      <View style={{ position: "absolute", bottom: 40, left: 20 }}>
-        <Text style={txt(20)}>
-          Set {currentSet}/{totalSets}
-        </Text>
-        <Text style={txt(18)}>
-          Reps: {repsThisSet}/{repsTarget}
-        </Text>
-        <Text style={txt(16)}>Angle: {angleUI}°</Text>
-        <Text style={{ color: "#9ca3af" }}>Time: {elapsed}s</Text>
-        <Text style={{ color: motionUI ? "#22c55e" : "#9ca3af" }}>
-          {motionUI ? "Motion detected" : "Idle"}
-        </Text>
-      </View>
-
+      {/* Workout Complete Modal */}
       {workoutEnded && (
-        <Overlay>
-          <Title>Workout completed</Title>
-          {!pdfUrl && (
-            <Primary
-              text={generatingPdf ? "Generating..." : "Generate Report"}
-              onPress={generatePdf}
-            />
-          )}
-          {pdfUrl && (
-            <Primary
-              text="Open PDF Report"
-              onPress={() => Linking.openURL(pdfUrl)}
-            />
-          )}
-          <Secondary text="Repeat Workout" onPress={repeatWorkout} />
-        </Overlay>
+        <View style={styles.modal}>
+          <View style={styles.modalContent}>
+            <View style={styles.successIcon}>
+              <Ionicons name="checkmark-circle" size={60} color={COLORS.success} />
+            </View>
+
+            <Text style={styles.modalTitle}>Workout Complete! 🎉</Text>
+
+            <View style={styles.summaryStats}>
+              <SummaryStat label="Total Reps" value={totalReps} />
+              <SummaryStat label="Total Sets" value={currentSet} />
+              <SummaryStat label="Duration" value={formatTime(elapsed)} />
+            </View>
+
+            <View style={styles.buttonGroup}>
+              {!pdfUrl ? (
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryBtn]}
+                  onPress={generatePdf}
+                  disabled={generatingPdf}
+                >
+                  {generatingPdf ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="document-text" size={18} color="#fff" />
+                      <Text style={styles.buttonText}>Generate Report</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryBtn]}
+                  onPress={() => Linking.openURL(pdfUrl)}
+                >
+                  <Ionicons name="open" size={18} color="#fff" />
+                  <Text style={styles.buttonText}>Open PDF Report</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity style={[styles.button, styles.secondaryBtn]} onPress={repeatWorkout}>
+                <Ionicons name="refresh" size={18} color={COLORS.primary} />
+                <Text style={[styles.buttonText, { color: COLORS.primary }]}>Repeat Workout</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={[styles.button, styles.secondaryBtn]} onPress={goBack}>
+                <Ionicons name="home" size={18} color={COLORS.primary} />
+                <Text style={[styles.buttonText, { color: COLORS.primary }]}>Back to Home</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
     </SafeAreaView>
   );
 }
 
-/* ---------------- UI HELPERS ---------------- */
-
-const btn = (pos) => ({
-  position: "absolute",
-  top: 20,
-  padding: 10,
-  borderRadius: 20,
-  backgroundColor: "rgba(0,0,0,0.6)",
-  zIndex: 50,
-  ...pos,
-});
-
-const endBtn = {
-  position: "absolute",
-  top: 40,
-  alignSelf: "center",
-  backgroundColor: "#fecaca",
-  padding: 15,
-  borderRadius: 20,
-};
-
-const Overlay = ({ children }) => (
-  <View
-    style={{
-      position: "absolute",
-      bottom: 120,
-      left: 20,
-      right: 20,
-      padding: 16,
-      borderRadius: 12,
-      backgroundColor: "rgba(0,0,0,0.85)",
-    }}
-  >
-    {children}
+const SummaryStat = ({ label, value }) => (
+  <View style={styles.summaryStatItem}>
+    <Text style={styles.summaryLabel}>{label}</Text>
+    <Text style={styles.summaryValue}>{value}</Text>
   </View>
 );
 
-const Primary = ({ text, onPress }) => (
-  <TouchableOpacity
-    onPress={onPress}
-    style={{
-      backgroundColor: "#22c55e",
-      padding: 12,
-      borderRadius: 8,
-      marginTop: 10,
-      alignItems: "center",
-    }}
-  >
-    <Text style={{ fontWeight: "700" }}>{text}</Text>
-  </TouchableOpacity>
-);
-
-const Secondary = ({ text, onPress }) => (
-  <TouchableOpacity
-    onPress={onPress}
-    style={{
-      backgroundColor: "#e5e7eb",
-      padding: 12,
-      borderRadius: 8,
-      marginTop: 8,
-      alignItems: "center",
-    }}
-  >
-    <Text style={{ fontWeight: "700" }}>{text}</Text>
-  </TouchableOpacity>
-);
-
-const Title = ({ children }) => (
-  <Text style={{ color: "#fff", fontSize: 18, marginBottom: 8 }}>
-    {children}
-  </Text>
-);
-
-const txt = (size) => ({
-  color: "#fff",
-  fontSize: size,
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.dark,
+  },
+  camera: {
+    flex: 1,
+  },
+  headerControls: {
+    position: "absolute",
+    top: 16,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    zIndex: 10,
+  },
+  controlBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  statsOverlay: {
+    position: "absolute",
+    bottom: 140,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.1)",
+  },
+  statLabel: {
+    fontSize: 11,
+    color: COLORS.muted,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  statValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#fff",
+  },
+  progressContainer: {
+    position: "absolute",
+    bottom: 115,
+    left: 16,
+    right: 16,
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: COLORS.success,
+    borderRadius: 3,
+  },
+  motionStatus: {
+    position: "absolute",
+    bottom: 75,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  motionIndicator: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  motionText: {
+    color: "#fff",
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  endBtn: {
+    position: "absolute",
+    bottom: 20,
+    left: 16,
+    right: 16,
+    height: 48,
+    backgroundColor: COLORS.danger,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  endBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  modal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 50,
+  },
+  modalContent: {
+    backgroundColor: COLORS.light,
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    alignItems: "center",
+  },
+  successIcon: {
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    color: COLORS.dark,
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  summaryStats: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    marginBottom: 24,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  summaryStatItem: {
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontSize: 12,
+    color: COLORS.muted,
+    fontWeight: "500",
+    marginBottom: 4,
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.primary,
+  },
+  buttonGroup: {
+    width: "100%",
+    gap: 10,
+  },
+  button: {
+    height: 48,
+    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  primaryBtn: {
+    backgroundColor: COLORS.primary,
+  },
+  secondaryBtn: {
+    backgroundColor: "#f0f0f0",
+  },
+  buttonText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#fff",
+  },
 });

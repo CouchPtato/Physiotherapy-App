@@ -16,10 +16,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ColorTheme } from "../constants/GlobalStyles";
-
-/* ✅ COMMON API BASE */
-import { API_BASE } from "../constants/api";
+// Colors
+const COLORS = {
+  primary: "#6366f1",
+  success: "#10b981",
+  warning: "#f59e0b",
+  danger: "#ef4444",
+  dark: "#1f2937",
+  light: "#f9fafb",
+  muted: "#6b7280",
+};
 
 export default function UploadWorkoutScreen() {
   const router = useRouter();
@@ -38,52 +44,46 @@ export default function UploadWorkoutScreen() {
   const [analysisData, setAnalysisData] = useState(null);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-
-  /* ---------------- NAV ---------------- */
+  const [error, setError] = useState(null);
 
   const handleBack = () => {
     router.back();
   };
 
-  /* ---------------- PICK VIDEO ---------------- */
-
   const handleChooseVideo = async () => {
     try {
+      setError(null);
       const result = await DocumentPicker.getDocumentAsync({
         type: "video/*",
       });
       if (result.canceled) return;
 
-      const asset =
-        result.assets && result.assets.length > 0
-          ? result.assets[0]
-          : result;
+      const asset = result.assets && result.assets.length > 0 ? result.assets[0] : result;
 
       setSelectedVideo(asset);
       setAnalysisData(null);
       setProcessedVideoUri(null);
       setPdfUrl(null);
 
-      Alert.alert("Video Selected", asset.name || "Video ready");
-    } catch {
+      Alert.alert("Success", `Video "${asset.name}" selected successfully`);
+    } catch (err) {
+      setError("Could not select a video. Please try again.");
       Alert.alert("Error", "Could not select a video.");
     }
   };
 
-  /* ---------------- ANALYZE VIDEO ---------------- */
-
   const handleAnalyze = async () => {
     if (!selectedVideo) {
-      Alert.alert("No video", "Please choose a video first.");
+      setError("Please choose a video first.");
       return;
     }
 
     try {
+      setError(null);
       setIsAnalyzing(true);
 
       const fileUri = selectedVideo.uri;
       const fileName = selectedVideo.name || "exercise.mp4";
-
       const formData = new FormData();
 
       if (Platform.OS === "web") {
@@ -104,46 +104,39 @@ export default function UploadWorkoutScreen() {
       formData.append("assigned_reps", String(repsTarget));
       formData.append("sets", String(totalSets));
 
-      const res = await fetch(`${API_BASE}/analyze_video`, {
+      const res = await fetch("http://192.168.1.4:8000/analyze_video", {
         method: "POST",
         body: formData,
       });
 
       if (!res.ok) {
-        Alert.alert("Error", "Failed to analyze the uploaded video.");
-        return;
+        throw new Error("Failed to analyze video");
       }
 
       const data = await res.json();
       setAnalysisData(data);
 
       if (data.processed_video_url) {
-        setProcessedVideoUri(`${API_BASE}${data.processed_video_url}`);
+        setProcessedVideoUri(`http://192.168.1.4:8000${data.processed_video_url}`);
       }
 
-      Alert.alert(
-        "Analysis Complete",
-        `Reps detected: ${data.reps ?? "N/A"}`
-      );
-    } catch {
-      Alert.alert(
-        "Error",
-        "Something went wrong while analyzing the video."
-      );
+      Alert.alert("Success", `Analysis complete! Detected ${data.reps ?? 0} reps`);
+    } catch (err) {
+      setError("Failed to analyze video. Please try again.");
+      Alert.alert("Error", "Failed to analyze video");
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  /* ---------------- GENERATE PDF ---------------- */
-
   const handleGeneratePdf = async () => {
     if (!analysisData) {
-      Alert.alert("No analysis", "Analyze a video first.");
+      setError("Please analyze a video first.");
       return;
     }
 
     try {
+      setError(null);
       const duration = analysisData.duration ?? 0;
       const totalReps = analysisData.reps ?? 0;
       const assignedTotalReps = repsTarget * totalSets;
@@ -164,31 +157,26 @@ export default function UploadWorkoutScreen() {
         form_score: formScore,
       };
 
-      const res = await fetch(`${API_BASE}/generate_report`, {
+      const res = await fetch("http://192.168.1.4:8000/generate_report", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
-        Alert.alert("Error", "Failed to generate PDF report.");
-        return;
+        throw new Error("Failed to generate report");
       }
 
       const data = await res.json();
-      const fullUrl = `${API_BASE}${data.url}`;
+      const fullUrl = `http://192.168.1.4:8000${data.url}`;
       setPdfUrl(fullUrl);
 
-      Alert.alert("Report Ready", "Tap 'Open PDF' to view.");
-    } catch {
-      Alert.alert(
-        "Error",
-        "Something went wrong while generating the report."
-      );
+      Alert.alert("Success", "Report generated successfully!");
+    } catch (err) {
+      setError("Failed to generate PDF report. Please try again.");
+      Alert.alert("Error", "Failed to generate PDF report");
     }
   };
-
-  /* ---------------- OPEN PDF ---------------- */
 
   const handleOpenPdf = () => {
     if (pdfUrl) {
@@ -198,262 +186,428 @@ export default function UploadWorkoutScreen() {
     }
   };
 
-  /* ---------------- UI VALUES ---------------- */
-
   const duration = analysisData?.duration ?? 0;
   const reps = analysisData?.reps ?? 0;
   const formScore = analysisData?.form_score ?? 0;
 
-  /* ---------------- UI ---------------- */
+  const isReady = analysisData && processedVideoUri;
 
   return (
     <SafeAreaView style={styles.container}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBack} style={styles.iconBtn}>
-          <Ionicons
-            name="chevron-back"
-            size={22}
-            color={ColorTheme.fourth}
-          />
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={COLORS.dark} />
         </TouchableOpacity>
 
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>{name}</Text>
-          <Text style={styles.headerSub}>Upload & Analyze Video</Text>
-          {patientName ? (
-            <Text style={styles.headerPatient}>
-              Patient: {patientName}
-              {patientId ? ` • ID: ${patientId}` : ""}
-            </Text>
-          ) : null}
+          <Text style={styles.headerSubtitle}>Upload & Analyze</Text>
         </View>
 
-        <View style={styles.chip}>
-          <Ionicons
-            name="person-outline"
-            size={14}
-            color={ColorTheme.first}
-            style={{ marginRight: 4 }}
-          />
-          <Text style={styles.chipText}>{doctor}</Text>
+        <View style={styles.doctorChip}>
+          <Ionicons name="person" size={14} color="#fff" style={{ marginRight: 4 }} />
+          <Text style={styles.doctorText}>{doctor}</Text>
         </View>
       </View>
 
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 20 }}
-      >
-        <View style={styles.videoWrapper}>
-          {processedVideoUri ? (
-            <Video
-              style={styles.video}
-              source={{ uri: processedVideoUri }}
-              resizeMode="contain"
-              useNativeControls
-              isLooping
-              shouldPlay
-            />
-          ) : (
-            <View style={styles.videoPlaceholder}>
-              <Ionicons name="videocam-outline" size={40} color="#9ca3af" />
-              <Text style={styles.videoPlaceholderText}>
-                Choose a video and analyze to see results.
-              </Text>
+      {/* Patient Info */}
+      {patientName ? (
+        <View style={styles.patientInfo}>
+          <View style={styles.patientDetail}>
+            <Ionicons name="person-circle" size={16} color={COLORS.primary} />
+            <Text style={styles.patientName}>{patientName}</Text>
+          </View>
+          {patientId && (
+            <View style={styles.patientDetail}>
+              <Ionicons name="barcode" size={16} color={COLORS.primary} />
+              <Text style={styles.patientId}>{patientId}</Text>
             </View>
           )}
         </View>
+      ) : null}
 
-        {isAnalyzing && (
-          <View style={styles.loadingRow}>
-            <ActivityIndicator size="small" color={ColorTheme.fourth} />
-            <Text style={styles.loadingText}>
-              Analyzing video, please wait…
-            </Text>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Video Display */}
+        <View style={styles.videoSection}>
+          <Text style={styles.sectionTitle}>Exercise Video</Text>
+          <View style={styles.videoWrapper}>
+            {processedVideoUri ? (
+              <Video
+                style={styles.video}
+                source={{ uri: processedVideoUri }}
+                resizeMode="contain"
+                useNativeControls
+                isLooping
+                shouldPlay
+              />
+            ) : (
+              <View style={styles.videoPlaceholder}>
+                <Ionicons name="videocam-outline" size={48} color={COLORS.muted} />
+                <Text style={styles.placeholderText}>No video selected</Text>
+                <Text style={styles.placeholderSubtext}>
+                  Choose and analyze a video to get started
+                </Text>
+              </View>
+            )}
           </View>
-        )}
+        </View>
 
-        <View style={{ marginTop: 14 }}>
+        {/* Action Buttons */}
+        <View style={styles.actionSection}>
           <TouchableOpacity
-            style={[styles.mainBtn, styles.secondaryBtn, { marginBottom: 8 }]}
+            style={[styles.button, styles.secondaryBtn]}
             onPress={handleChooseVideo}
             disabled={isAnalyzing}
           >
-            <Ionicons
-              name="cloud-upload-outline"
-              size={18}
-              color={ColorTheme.fourth}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.mainBtnText, { color: ColorTheme.fourth }]}>
-              Choose Video
-            </Text>
+            <Ionicons name="cloud-upload-outline" size={20} color={COLORS.primary} />
+            <Text style={[styles.buttonText, { color: COLORS.primary }]}>Choose Video</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[
-              styles.mainBtn,
-              styles.primaryBtn,
-              { opacity: isAnalyzing ? 0.6 : 1 },
-            ]}
+            style={[styles.button, styles.primaryBtn, { opacity: isAnalyzing ? 0.6 : 1 }]}
             onPress={handleAnalyze}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || !selectedVideo}
           >
-            <Ionicons
-              name="fitness-outline"
-              size={18}
-              color={ColorTheme.first}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.mainBtnText, { color: ColorTheme.first }]}>
-              {isAnalyzing ? "Analyzing..." : "Analyze Video"}
-            </Text>
+            {isAnalyzing ? (
+              <>
+                <ActivityIndicator color="#fff" size="small" />
+                <Text style={styles.buttonText}>Analyzing...</Text>
+              </>
+            ) : (
+              <>
+                <Ionicons name="fitness-outline" size={20} color="#fff" />
+                <Text style={styles.buttonText}>Analyze Video</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
 
-        <View style={styles.statsCard}>
-          <Text style={styles.statsTitle}>Analysis Summary</Text>
-          <View style={styles.statsRow}>
-            <Text style={styles.statsLabel}>Detected Reps</Text>
-            <Text style={styles.statsValue}>{reps}</Text>
-          </View>
-          <View style={styles.statsRow}>
-            <Text style={styles.statsLabel}>Duration (sec)</Text>
-            <Text style={styles.statsValue}>{duration.toFixed(1)}</Text>
-          </View>
-          <View style={styles.statsRow}>
-            <Text style={styles.statsLabel}>Form Score</Text>
-            <Text style={styles.statsValue}>
-              {(formScore * 100).toFixed(1)}/100
-            </Text>
-          </View>
-        </View>
+        {/* Analysis Results */}
+        {isReady && (
+          <View style={styles.resultsSection}>
+            <Text style={styles.sectionTitle}>Analysis Results</Text>
 
-        <View style={styles.pdfSection}>
-          <TouchableOpacity
-            style={[styles.mainBtn, styles.primaryBtn]}
-            onPress={handleGeneratePdf}
-          >
-            <Ionicons
-              name="document-text-outline"
-              size={18}
-              color={ColorTheme.first}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={[styles.mainBtnText, { color: ColorTheme.first }]}>
-              Generate PDF
-            </Text>
-          </TouchableOpacity>
-
-          {pdfUrl && (
-            <TouchableOpacity
-              style={[styles.mainBtn, styles.openBtn]}
-              onPress={handleOpenPdf}
-            >
-              <Ionicons
-                name="open-outline"
-                size={18}
-                color={ColorTheme.first}
-                style={{ marginRight: 6 }}
+            <View style={styles.statsGrid}>
+              <StatCard label="Reps Detected" value={reps} unit="" />
+              <StatCard label="Duration" value={duration.toFixed(1)} unit="sec" />
+              <StatCard label="Form Score" value={(formScore * 100).toFixed(0)} unit="/100" />
+              <StatCard
+                label="Avg Time/Rep"
+                value={(duration / (reps || 1)).toFixed(1)}
+                unit="sec"
               />
-              <Text style={[styles.mainBtnText, { color: ColorTheme.first }]}>
-                Open PDF
+            </View>
+
+            {/* Performance Gauge */}
+            <View style={styles.gaugeSection}>
+              <Text style={styles.gaugeLabel}>Performance</Text>
+              <View style={styles.gauge}>
+                <View
+                  style={[
+                    styles.gaugeFill,
+                    {
+                      width: `${Math.min((reps / (repsTarget * totalSets)) * 100, 100)}%`,
+                      backgroundColor:
+                        reps >= repsTarget * totalSets
+                          ? COLORS.success
+                          : reps >= (repsTarget * totalSets) / 2
+                            ? COLORS.warning
+                            : COLORS.danger,
+                    },
+                  ]}
+                />
+              </View>
+              <Text style={styles.gaugeText}>
+                {reps} / {repsTarget * totalSets} reps completed
               </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            </View>
+          </View>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <View style={styles.errorBox}>
+            <Ionicons name="alert-circle" size={18} color={COLORS.danger} />
+            <Text style={styles.errorText}>{error}</Text>
+          </View>
+        )}
+
+        {/* PDF Section */}
+        {isReady && (
+          <View style={styles.pdfSection}>
+            <Text style={styles.sectionTitle}>Generate Report</Text>
+
+            {!pdfUrl ? (
+              <TouchableOpacity style={[styles.button, styles.primaryBtn]} onPress={handleGeneratePdf}>
+                <Ionicons name="document-text-outline" size={20} color="#fff" />
+                <Text style={styles.buttonText}>Generate PDF Report</Text>
+              </TouchableOpacity>
+            ) : (
+              <>
+                <TouchableOpacity
+                  style={[styles.button, styles.primaryBtn]}
+                  onPress={handleOpenPdf}
+                >
+                  <Ionicons name="open-outline" size={20} color="#fff" />
+                  <Text style={styles.buttonText}>Open PDF Report</Text>
+                </TouchableOpacity>
+
+                <Text style={styles.successText}>
+                  ✓ Report generated successfully
+                </Text>
+              </>
+            )}
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-/* ---------------- STYLES ---------------- */
+// Stat Card Component
+const StatCard = ({ label, value, unit }) => (
+  <View style={styles.statCard}>
+    <Text style={styles.statLabel}>{label}</Text>
+    <View style={styles.statValue}>
+      <Text style={styles.statNumber}>{value}</Text>
+      {unit && <Text style={styles.statUnit}>{unit}</Text>}
+    </View>
+  </View>
+);
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: ColorTheme.first },
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.light,
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 4,
+    paddingVertical: 12,
+    backgroundColor: "#fff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
   },
-  iconBtn: { padding: 6, marginRight: 6 },
-  headerTitle: { fontSize: 18, fontWeight: "700", color: ColorTheme.fourth },
-  headerSub: { fontSize: 12, color: ColorTheme.fourth, opacity: 0.7 },
-  headerPatient: { fontSize: 11, color: "#9ca3af", marginTop: 2 },
-  chip: {
+  backBtn: {
+    padding: 8,
+    marginRight: 12,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: COLORS.dark,
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: COLORS.muted,
+    fontWeight: "500",
+  },
+  doctorChip: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: ColorTheme.fourth,
+    backgroundColor: COLORS.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
-  chipText: { fontSize: 11, fontWeight: "600", color: ColorTheme.first },
+  doctorText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#fff",
+  },
+  patientInfo: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: "rgba(99, 102, 241, 0.05)",
+    gap: 16,
+  },
+  patientDetail: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  patientName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.dark,
+  },
+  patientId: {
+    fontSize: 12,
+    color: COLORS.muted,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: COLORS.dark,
+    marginBottom: 12,
+    marginTop: 16,
+  },
+  videoSection: {
+    marginBottom: 8,
+  },
   videoWrapper: {
-    marginTop: 10,
     borderRadius: 16,
     overflow: "hidden",
     backgroundColor: "#000",
-    height: 230,
+    height: 280,
+    borderWidth: 2,
+    borderColor: "#e5e7eb",
   },
-  video: { flex: 1 },
+  video: {
+    flex: 1,
+  },
   videoPlaceholder: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 20,
   },
-  videoPlaceholderText: {
-    marginTop: 8,
-    fontSize: 12,
-    color: "#e5e7eb",
+  placeholderText: {
+    marginTop: 12,
+    fontSize: 14,
+    fontWeight: "600",
+    color: COLORS.dark,
     textAlign: "center",
   },
-  mainBtn: {
-    height: 46,
-    borderRadius: 999,
+  placeholderSubtext: {
+    marginTop: 4,
+    fontSize: 12,
+    color: COLORS.muted,
+    textAlign: "center",
+  },
+  actionSection: {
+    gap: 10,
+    marginVertical: 16,
+  },
+  button: {
+    height: 48,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
+    gap: 10,
   },
-  mainBtnText: { fontSize: 14, fontWeight: "700" },
-  primaryBtn: { backgroundColor: ColorTheme.fourth },
-  secondaryBtn: { backgroundColor: "#e5e7eb" },
-  openBtn: { marginTop: 8, backgroundColor: "#6b7280" },
-  statsCard: {
-    marginTop: 14,
-    borderRadius: 12,
-    backgroundColor: ColorTheme.second,
-    padding: 12,
+  primaryBtn: {
+    backgroundColor: COLORS.primary,
   },
-  statsTitle: {
-    fontSize: 15,
+  secondaryBtn: {
+    backgroundColor: "#fff",
+    borderWidth: 2,
+    borderColor: COLORS.primary,
+  },
+  buttonText: {
+    fontSize: 14,
     fontWeight: "700",
-    color: ColorTheme.fourth,
+    color: "#fff",
+  },
+  resultsSection: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  statsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    minWidth: "48%",
+    backgroundColor: COLORS.light,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+  },
+  statLabel: {
+    fontSize: 11,
+    color: COLORS.muted,
+    fontWeight: "500",
     marginBottom: 6,
   },
-  statsRow: {
+  statValue: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 4,
+    alignItems: "baseline",
+    gap: 4,
   },
-  statsLabel: { fontSize: 13, color: "#6b7280" },
-  statsValue: {
-    fontSize: 13,
+  statNumber: {
+    fontSize: 20,
     fontWeight: "700",
-    color: ColorTheme.fourth,
+    color: COLORS.primary,
   },
-  pdfSection: { marginTop: 16, marginBottom: 10 },
-  loadingRow: {
+  statUnit: {
+    fontSize: 11,
+    color: COLORS.muted,
+    fontWeight: "600",
+  },
+  gaugeSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#e5e7eb",
+  },
+  gaugeLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.dark,
+    marginBottom: 8,
+  },
+  gauge: {
+    height: 8,
+    backgroundColor: "#e5e7eb",
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 8,
+  },
+  gaugeFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  gaugeText: {
+    fontSize: 12,
+    color: COLORS.muted,
+    fontWeight: "500",
+  },
+  errorBox: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderRadius: 12,
+    padding: 12,
+    marginVertical: 12,
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 8,
-    paddingHorizontal: 4,
+    gap: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: COLORS.danger,
   },
-  loadingText: {
-    marginLeft: 8,
+  errorText: {
+    flex: 1,
     fontSize: 12,
-    color: "#6095ff",
+    color: COLORS.danger,
+    fontWeight: "500",
+  },
+  pdfSection: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 16,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+  },
+  successText: {
+    marginTop: 12,
+    fontSize: 12,
+    color: COLORS.success,
+    fontWeight: "600",
+    textAlign: "center",
   },
 });

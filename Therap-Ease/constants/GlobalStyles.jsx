@@ -1,14 +1,21 @@
 import { StyleSheet } from "react-native";
 
+// Modern, professional color palette
 export const ColorTheme = {
-  first: "#F8F9FA",
-  second: "#DEE2E6",
+  first: "#F9FAFB",      // Light background
+  second: "#E5E7EB",     // Light gray
   third: "rgba(0, 0, 0, 0.7)",
-  fourth: "#5CA4A9",
-  fifth: "#9BC4BC",
-  sixth: "#a6cbc3ff",
-  seventh: "#212529",
-  error: "#FF6B6B",
+  fourth: "#6366F1",     // Primary indigo
+  fifth: "#8B5CF6",      // Purple accent
+  sixth: "#9CA3AF",      // Muted gray
+  seventh: "#1F2937",    // Dark text
+  primary: "#6366F1",
+  success: "#10B981",
+  warning: "#F59E0B",
+  danger: "#EF4444",
+  dark: "#1F2937",
+  light: "#F9FAFB",
+  muted: "#6B7280",
 };
 
 export const styles = StyleSheet.create({
@@ -16,38 +23,95 @@ export const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     backgroundColor: ColorTheme.first,
-    padding: 8,
+    padding: 16,
     alignItems: "center",
+  },
+  screen: {
+    flex: 1,
+    backgroundColor: ColorTheme.light,
   },
   paragraph: {
     margin: 10,
     fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
-    color: ColorTheme.first,
+    color: ColorTheme.dark,
   },
   actionButton: {
-    backgroundColor: ColorTheme.fifth,
+    backgroundColor: ColorTheme.primary,
     width: "70%",
-    borderRadius: 10,
-    paddingVertical: 10,
+    borderRadius: 12,
+    paddingVertical: 12,
   },
   formContainer: {
-    width: "70%",
+    width: "85%",
     overflow: "hidden",
-    marginTop: 5,
+    marginTop: 16,
   },
   input: {
     backgroundColor: "white",
-    borderRadius: 8,
-    padding: 10,
-    marginVertical: 5,
-    borderWidth: 1,
-    borderColor: ColorTheme.fourth,
+    borderRadius: 10,
+    padding: 12,
+    marginVertical: 8,
+    borderWidth: 1.5,
+    borderColor: ColorTheme.second,
+    fontSize: 14,
+    fontWeight: "500",
   },
   submitButton: {
-    backgroundColor: ColorTheme.seventh,
-    borderRadius: 8,
+    backgroundColor: ColorTheme.primary,
+    borderRadius: 10,
+    paddingVertical: 12,
+    marginVertical: 12,
+    alignItems: "center",
+  },
+  submitText: {
+    color: "white",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+  radioOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginVertical: 8,
+  },
+  radioCircle: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: ColorTheme.primary,
+    marginRight: 10,
+  },
+  radioSelected: {
+    backgroundColor: ColorTheme.primary,
+  },
+  radioLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: ColorTheme.dark,
+  },
+  headerCard: {
+    backgroundColor: "white",
+    borderBottomWidth: 1,
+    borderBottomColor: ColorTheme.second,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: ColorTheme.dark,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: ColorTheme.muted,
+    marginTop: 2,
+  },
+});
     paddingVertical: 10,
     marginTop: 10,
   },
