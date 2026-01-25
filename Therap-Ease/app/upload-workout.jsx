@@ -16,6 +16,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../hooks/use-theme";
+import { BASE_URL } from "../constants/api";
 
 // Colors
 const COLORS = {
@@ -116,7 +117,7 @@ export default function UploadWorkoutScreen() {
       formData.append("assigned_reps", String(repsTarget));
       formData.append("sets", String(totalSets));
 
-      const res = await fetch("http://192.168.1.4:8000/analyze_video", {
+      const res = await fetch(`${BASE_URL}/analyze_video`, {
         method: "POST",
         body: formData,
       });
@@ -129,7 +130,7 @@ export default function UploadWorkoutScreen() {
       setAnalysisData(data);
 
       if (data.processed_video_url) {
-        setProcessedVideoUri(`http://192.168.1.4:8000${data.processed_video_url}`);
+        setProcessedVideoUri(`${BASE_URL}${data.processed_video_url}`);
       }
 
       Alert.alert("Success", `Analysis complete! Detected ${data.reps ?? 0} reps`);
@@ -169,7 +170,7 @@ export default function UploadWorkoutScreen() {
         form_score: formScore,
       };
 
-      const res = await fetch("http://192.168.1.4:8000/generate_report", {
+      const res = await fetch(`${BASE_URL}/generate_report`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -180,7 +181,7 @@ export default function UploadWorkoutScreen() {
       }
 
       const data = await res.json();
-      const fullUrl = `http://192.168.1.4:8000${data.url}`;
+      const fullUrl = `${BASE_URL}${data.url}`;
       setPdfUrl(fullUrl);
 
       Alert.alert("Success", "Report generated successfully!");
