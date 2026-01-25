@@ -63,6 +63,7 @@ const styles = StyleSheet.create({
     // paddingVertical: 15,
     // paddingHorizontal: 15,
     borderWidth: 1,
+    borderColor: "transparent",
   },
 
   scheduleOuter: {
@@ -206,7 +207,7 @@ function SecondCard({ role, dynamicColors }) {
               height: "80%",
               marginTop: 10,
               elevation: 5,
-              backgroundColor: ColorTheme.first,
+              backgroundColor: dynamicColors.containerBg,
               justifyContent: "center",
               borderColor: dynamicColors.border,
             },

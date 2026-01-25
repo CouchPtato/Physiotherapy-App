@@ -42,14 +42,14 @@ const SectionHeader = ({ title, count, subtitle, dynamicColors }) => (
       <Text style={[styles.headingText, { color: dynamicColors.text }]}>{title}</Text>
       {subtitle ? <Text style={[styles.subHeadingText, { color: dynamicColors.textSecondary }]}>{subtitle}</Text> : null}
     </View>
-    <View style={styles.countBadge}>
-      <Text style={styles.countBadgeText}>{count}</Text>
+    <View style={[styles.countBadge, { backgroundColor: dynamicColors.containerBg }]}>
+      <Text style={[styles.countBadgeText, { color: dynamicColors.text }]}>{count}</Text>
     </View>
   </View>
 );
 
 const AppointmentItem = ({ item, type, dynamicColors }) => (
-  <View style={[styles.itemContainer, { borderBottomColor: dynamicColors.border }]}>
+  <View style={[styles.itemContainer, { backgroundColor: dynamicColors.cardBg, borderBottomColor: dynamicColors.border }]}>
     <View style={styles.itemLeft}>
       <Text style={[styles.itemName, { color: dynamicColors.text }]}>{item.name}</Text>
       <Text style={[styles.itemIdText, { color: dynamicColors.textSecondary }]}>#{item.id}</Text>
@@ -170,7 +170,6 @@ function AppointmentsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: ColorTheme.first,
   },
 
   scroll: {
@@ -184,7 +183,6 @@ const styles = StyleSheet.create({
   },
 
   card: {
-    backgroundColor: ColorTheme.fourth,
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 10,
@@ -206,12 +204,10 @@ const styles = StyleSheet.create({
   headingText: {
     fontSize: 20,
     fontWeight: "700",
-    color: ColorTheme.first,
   },
 
   subHeadingText: {
     fontSize: 12,
-    color: ColorTheme.first,
     opacity: 0.8,
     marginTop: 2,
   },
@@ -221,7 +217,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: ColorTheme.first,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -229,14 +224,13 @@ const styles = StyleSheet.create({
   countBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: ColorTheme.fourth,
   },
 
   itemContainer: {
-    backgroundColor: ColorTheme.first,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 8,
+    borderBottomWidth: 1,
   },
 
   itemLeft: {
@@ -250,24 +244,20 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: 16,
     fontWeight: "600",
-    color: ColorTheme.fourth,
   },
 
   itemIdText: {
     fontSize: 12,
-    color: ColorTheme.fourth,
     opacity: 0.7,
     marginTop: 1,
   },
 
   itemDateText: {
     fontSize: 13,
-    color: ColorTheme.fourth,
   },
 
   itemTimeText: {
     fontSize: 12,
-    color: ColorTheme.fourth,
     opacity: 0.8,
     marginTop: 1,
   },
@@ -303,7 +293,6 @@ const styles = StyleSheet.create({
   },
 
   emptyStateText: {
-    color: ColorTheme.first,
     opacity: 0.9,
     fontSize: 13,
   },
