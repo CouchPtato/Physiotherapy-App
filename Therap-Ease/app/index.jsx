@@ -8,6 +8,10 @@ import MainScreen from "./screens/MainScreen.jsx";
 import ExerciseScreen from "./screens/ExerciseScreen.jsx";
 import { useTheme } from "../hooks/use-theme";
 
+// Dynamically import the screen components
+import LiveWorkoutScreen from "./live-workout.jsx";
+import UploadWorkoutScreen from "./upload-workout.jsx";
+
 const Stack = createStackNavigator();
 
 /* 🔐 AUTH LOADER */
@@ -59,9 +63,16 @@ function MyStack() {
             doctor={route.params.doctor}
             endDate={route.params.endDate}
             notes={route.params.notes}
+            exerciseKey={route.params.exerciseKey}
+            patientName={route.params.patientName}
+            patientId={route.params.patientId}
           />
         )}
       </Stack.Screen>
+
+      <Stack.Screen name="LiveWorkout" component={LiveWorkoutScreen} />
+
+      <Stack.Screen name="UploadWorkout" component={UploadWorkoutScreen} />
     </Stack.Navigator>
   );
 }

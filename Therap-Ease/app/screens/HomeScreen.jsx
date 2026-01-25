@@ -1,5 +1,5 @@
 import * as Linking from 'expo-linking';
-import { useRouter } from "expo-router";
+import { useNavigation } from "@react-navigation/native";
 import React from "react";
 import {
   FlatList,
@@ -241,7 +241,7 @@ function SecondCard({ role, dynamicColors }) {
 }
 
 function ThirdCard({ role }) {
-  const router = useRouter(); // ✅ use expo-router
+  const navigation = useNavigation(); // ✅ use React Navigation
 
   if (role === "patient") {
     // ✅ add exerciseKey so LiveWorkout knows which tracking logic to use
@@ -304,17 +304,14 @@ function ThirdCard({ role }) {
     ];
 
     const handleOpenExercise = (it) => {
-      router.push({
-        pathname: "/exercise", // 👈 your ExerciseScreen route
-        params: {
-          exerciseKey: it.exerciseKey,
-          name: it.title,              // shown on Exercise + LiveWorkout
-          reps: String(it.reps),
-          sets: String(it.sets),
-          doctor: it.doctor,
-          endDate: it.endDate,
-          notes: it.notes,
-        },
+      navigation.navigate("Exercise", {
+        exerciseKey: it.exerciseKey,
+        name: it.title,              // shown on Exercise + LiveWorkout
+        reps: String(it.reps),
+        sets: String(it.sets),
+        doctor: it.doctor,
+        endDate: it.endDate,
+        notes: it.notes,
       });
     };
 

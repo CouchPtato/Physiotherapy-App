@@ -1,4 +1,4 @@
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import React from "react";
 import {
   Linking,
@@ -24,8 +24,9 @@ const EXERCISE_TUTORIALS = {
 };
 
 const ExerciseScreen = (props) => {
-  const router = useRouter();
-  const params = useLocalSearchParams();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const params = route.params || {};
 
   const name = params.name || props.name || "Squats";
   const reps = params.reps || props.reps || "10";
@@ -45,36 +46,30 @@ const ExerciseScreen = (props) => {
   const tutorialUrl = EXERCISE_TUTORIALS[exerciseKey];
 
   const handleStartLive = () => {
-    router.push({
-      pathname: "/live-workout",
-      params: {
-        exerciseKey,
-        name,
-        reps: String(reps),
-        sets: String(sets),
-        doctor,
-        endDate,
-        notes,
-        patientName: patientName || "",
-        patientId: patientId || "",
-      },
+    navigation.navigate("LiveWorkout", {
+      exerciseKey,
+      name,
+      reps: String(reps),
+      sets: String(sets),
+      doctor,
+      endDate,
+      notes,
+      patientName: patientName || "",
+      patientId: patientId || "",
     });
   };
 
   const handleUploadPress = () => {
-    router.push({
-      pathname: "/upload-workout",
-      params: {
-        exerciseKey,
-        name,
-        reps: String(reps),
-        sets: String(sets),
-        doctor,
-        endDate,
-        notes,
-        patientName: patientName || "",
-        patientId: patientId || "",
-      },
+    navigation.navigate("UploadWorkout", {
+      exerciseKey,
+      name,
+      reps: String(reps),
+      sets: String(sets),
+      doctor,
+      endDate,
+      notes,
+      patientName: patientName || "",
+      patientId: patientId || "",
     });
   };
 

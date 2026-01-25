@@ -1,5 +1,5 @@
 import { CameraView } from "expo-camera";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
 import { Text, View, TouchableOpacity, Linking, StyleSheet, ActivityIndicator } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -26,8 +26,9 @@ const COLORS = {
 };
 
 export default function LiveWorkoutScreen() {
-  const router = useRouter();
-  const params = useLocalSearchParams();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const params = route.params || {};
   const { isDarkMode } = useTheme();
 
   const exerciseKey = params.exerciseKey || "squat";

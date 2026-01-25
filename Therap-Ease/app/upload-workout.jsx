@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Video } from "expo-av";
 import * as DocumentPicker from "expo-document-picker";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -29,8 +29,9 @@ const COLORS = {
 };
 
 export default function UploadWorkoutScreen() {
-  const router = useRouter();
-  const params = useLocalSearchParams();
+  const navigation = useNavigation();
+  const route = useRoute();
+  const params = route.params || {};
   const { isDarkMode } = useTheme();
 
   const exerciseKey = params.exerciseKey || "squat";
