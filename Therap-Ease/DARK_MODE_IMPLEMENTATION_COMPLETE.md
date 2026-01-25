@@ -94,9 +94,9 @@ All screens now use consistent dynamic colors:
 
 ```javascript
 const dynamicColors = {
-  containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",      // Page background
+  containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",      // Page background
   cardBg: isDarkMode ? "#1F2937" : "#fff",              // Cards/sections
-  text: isDarkMode ? "#F9FAFB" : "#1F2937",             // Primary text
+  text: isDarkMode ? "#f4f4f4" : "#1F2937",             // Primary text
   textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",    // Secondary text
   border: isDarkMode ? "#374151" : "#E5E7EB",           // Borders/dividers
   inputBg: isDarkMode ? "#111827" : "#F3F4F6",          // Input fields
@@ -131,7 +131,7 @@ import { useTheme } from "../../hooks/use-theme";  // or "../hooks/use-theme" fo
 const { isDarkMode } = useTheme();
 
 const dynamicColors = {
-  containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+  containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
   // ... 5 more color properties
 };
 ```

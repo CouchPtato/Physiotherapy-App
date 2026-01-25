@@ -2,21 +2,21 @@ import { StyleSheet } from "react-native";
 
 // Light theme color palette
 export const LightTheme = {
-  first: "#F9FAFB",
-  second: "#E5E7EB",
+  first: "#ffffff",
+  second: "#d7d7d7",
   third: "rgba(0, 0, 0, 0.7)",
-  fourth: "#6366F1",
-  fifth: "#8B5CF6",
-  sixth: "#9CA3AF",
+  fourth: "#2b9d8a",
+  fifth: "#53a496",
+  sixth: "#fffefe",
   seventh: "#1F2937",
   primary: "#6366F1",
   success: "#10B981",
   warning: "#F59E0B",
   danger: "#EF4444",
   dark: "#1F2937",
-  light: "#F9FAFB",
+  light: "#f4f4f4",
   muted: "#6B7280",
-  bg: "#F9FAFB",
+  bg: "#f4f4f4",
   text: "#1F2937",
   border: "#E5E7EB",
 };
@@ -24,21 +24,21 @@ export const LightTheme = {
 // Dark theme color palette
 export const DarkTheme = {
   first: "#111827",
-  second: "#1F2937",
+  second: "#212d3d",
   third: "rgba(255, 255, 255, 0.7)",
-  fourth: "#818CF8",
-  fifth: "#A78BFA",
-  sixth: "#6B7280",
-  seventh: "#F9FAFB",
+  fourth: "#2b9d8a",
+  fifth: "#53a496",
+  sixth: "#b5b5b5",
+  seventh: "#f4f4f4",
   primary: "#818CF8",
   success: "#34D399",
   warning: "#FBBF24",
   danger: "#F87171",
-  dark: "#F9FAFB",
+  dark: "#f4f4f4",
   light: "#111827",
   muted: "#9CA3AF",
   bg: "#0F172A",
-  text: "#F9FAFB",
+  text: "#f4f4f4",
   border: "#1F2937",
 };
 
@@ -126,12 +126,12 @@ export const styles = StyleSheet.create({
     width: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: ColorTheme.primary,
+    borderColor: ColorTheme.fourth,
     marginRight: 8,
   },
 
   radioSelected: {
-    backgroundColor: ColorTheme.primary,
+    backgroundColor: ColorTheme.fourth,
   },
 
   radioLabel: {

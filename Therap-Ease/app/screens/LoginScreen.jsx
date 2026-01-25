@@ -142,10 +142,10 @@ const LoginScreen = ({ navigation }) => {
   const { isDarkMode } = useTheme();
   
   const dynamicColors = {
-    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
     headerBg: isDarkMode ? "#111827" : "#fff",
     cardBg: isDarkMode ? "#1F2937" : "#fff",
-    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    text: isDarkMode ? "#f4f4f4" : "#1F2937",
     textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
     border: isDarkMode ? "#374151" : "#E5E7EB",
   };
@@ -157,7 +157,7 @@ const LoginScreen = ({ navigation }) => {
 
         {/* REGISTER BUTTON */}
         <TouchableOpacity
-          style={styles.actionButton}
+          style={[styles.actionButton, { backgroundColor: ColorTheme.fourth }]}
           onPress={() => {
             setShowRegister(!showRegister);
             setShowLogin(false);
@@ -260,7 +260,7 @@ const LoginScreen = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[styles.submitButton, { backgroundColor: ColorTheme.fourth }]}
                   onPress={handleSubmit}
                 >
                   <Text style={styles.submitText}>Register</Text>
@@ -272,7 +272,7 @@ const LoginScreen = ({ navigation }) => {
 
         {/* LOGIN BUTTON */}
         <TouchableOpacity
-          style={[styles.actionButton, { marginTop: 10 }]}
+          style={[styles.actionButton, { marginTop: 10, backgroundColor: ColorTheme.fourth }]}
           onPress={() => {
             setShowLogin(!showLogin);
             setShowRegister(false);
@@ -334,7 +334,7 @@ const LoginScreen = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[styles.submitButton, { backgroundColor: ColorTheme.fourth }]}
                   onPress={handleSubmit}
                 >
                   <Text style={styles.submitText}>Login</Text>

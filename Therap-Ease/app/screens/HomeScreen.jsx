@@ -62,6 +62,7 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     // paddingVertical: 15,
     // paddingHorizontal: 15,
+    borderWidth: 1,
   },
 
   scheduleOuter: {
@@ -140,8 +141,9 @@ function SecondCard({ role, dynamicColors }) {
             height: "60%",
             alignItems: "center",
             paddingBottom: "1%",
-            // padding: "1%",
-            justifyContent: "center"
+            padding: "1%",
+            justifyContent: "center",
+            borderColor: dynamicColors.border,
           },
         ]}
       >
@@ -155,7 +157,7 @@ function SecondCard({ role, dynamicColors }) {
               "https://www.mayoclinic.org/healthy-lifestyle/fitness/in-depth/exercise/art-20048389"
             )
           }
-          style={[styles.card, { height: "40%", marginTop: 5, elevation: 5 }]}
+          style={[styles.card, { height: "40%", marginTop: 5, elevation: 5, borderColor: dynamicColors.border }]}
         >
           <Image
             source={img1}
@@ -170,7 +172,7 @@ function SecondCard({ role, dynamicColors }) {
               "https://www.healthline.com/nutrition/10-benefits-of-exercise"
             )
           }
-          style={[styles.card, { height: "40%", marginTop: 10, elevation: 5 }]}
+          style={[styles.card, { height: "40%", marginTop: 10, elevation: 5, borderColor: dynamicColors.border }]}
         >
           <Image
             source={img2}
@@ -206,6 +208,7 @@ function SecondCard({ role, dynamicColors }) {
               elevation: 5,
               backgroundColor: ColorTheme.first,
               justifyContent: "center",
+              borderColor: dynamicColors.border,
             },
           ]}
         >
@@ -216,7 +219,7 @@ function SecondCard({ role, dynamicColors }) {
                 style={{
                   padding: 10,
                   borderBottomWidth: 0.3,
-                  borderColor: ColorTheme.fifth,
+                  borderColor: dynamicColors.border,
                 }}
               >
                 <Text
@@ -240,7 +243,7 @@ function SecondCard({ role, dynamicColors }) {
   }
 }
 
-function ThirdCard({ role }) {
+function ThirdCard({ role, dynamicColors }) {
   const navigation = useNavigation(); // ✅ use React Navigation
 
   if (role === "patient") {
@@ -324,7 +327,8 @@ function ThirdCard({ role }) {
             height: "24%",
             padding: "2%",
             borderBottomWidth: 2,
-            borderBottomColor: ColorTheme.fifth,
+            borderBottomColor: dynamicColors.border,
+            borderColor: dynamicColors.border,
           },
         ]}
       >
@@ -380,7 +384,7 @@ function ThirdCard({ role }) {
 
 function UserCard({ username, role, dynamicColors }) {
   return (
-    <View style={[styles.card, { backgroundColor: dynamicColors.cardBg }]}>
+    <View style={[styles.card, { backgroundColor: dynamicColors.cardBg, borderColor: dynamicColors.border }]}>
       <Text style={[styles.text, { color: dynamicColors.text }]}>Hello,</Text>
       <Text style={[styles.text, styles.username, { color: dynamicColors.text }]}>
         {role === "doctor" ? `Dr. ${username}` : username}
@@ -393,9 +397,9 @@ function HomeScreen({ role }) {
   const { isDarkMode } = useTheme();
   
   const dynamicColors = {
-    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
     cardBg: isDarkMode ? "#1F2937" : "#fff",
-    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    text: isDarkMode ? "#f4f4f4" : "#1F2937",
     textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
     border: isDarkMode ? "#374151" : "#E5E7EB",
   };

@@ -88,9 +88,9 @@ const ExerciseScreen = (props) => {
   const { isDarkMode } = useTheme();
   
   const dynamicColors = {
-    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
     cardBg: isDarkMode ? "#1F2937" : "#fff",
-    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    text: isDarkMode ? "#f4f4f4" : "#1F2937",
     textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
     border: isDarkMode ? "#374151" : "#E5E7EB",
   };
@@ -254,7 +254,11 @@ const styles = StyleSheet.create({
   },
   headerWrapper: {
     width: "100%",
-    marginBottom: 16,
+    padding: 10,
+    marginBottom: 2,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ColorTheme.second
   },
   headerBadge: {
     flexDirection: "row",

@@ -11,7 +11,7 @@ const COLORS = {
   danger: "#EF4444",       // Red - Errors/Deletions
   warning: "#F59E0B",      // Orange - Alerts/Warnings
   dark: "#1F2937",         // Dark gray - Text
-  light: "#F9FAFB",        // Light gray - Backgrounds
+  light: "#f4f4f4",        // Light gray - Backgrounds
   muted: "#6B7280",        // Medium gray - Secondary text
   border: "#E5E7EB",       // Light border color
 };

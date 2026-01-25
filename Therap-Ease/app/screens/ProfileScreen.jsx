@@ -8,7 +8,7 @@ function ProfileScreen({role}) {
   const { isDarkMode } = useTheme();
   
   const dynamicColors = {
-    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
   };
 
   return (

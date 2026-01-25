@@ -16,13 +16,13 @@ const MOTION_TIMEOUT_MS = 800;
 
 // Colors
 const COLORS = {
-  primary: "#6366f1",
+  primary: "#2b9d8a",
   success: "#10b981",
   warning: "#f59e0b",
   danger: "#ef4444",
   dark: "#1f2937",
   light: "#f9fafb",
-  muted: "#6b7280",
+  muted: "#b5b5b5",
 };
 
 export default function LiveWorkoutScreen() {
@@ -39,9 +39,9 @@ export default function LiveWorkoutScreen() {
   const patientId = params.patientId || "P-2025-001";
 
   const dynamicColors = {
-    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
     cardBg: isDarkMode ? "#1F2937" : "#fff",
-    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    text: isDarkMode ? "#f4f4f4" : "#1F2937",
     textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
     border: isDarkMode ? "#374151" : "#E5E7EB",
   };
@@ -221,7 +221,7 @@ export default function LiveWorkoutScreen() {
 
   const goBack = () => {
     hardStopCamera();
-    router.back();
+    navigation.goBack();
   };
 
   const formatTime = (seconds) => {

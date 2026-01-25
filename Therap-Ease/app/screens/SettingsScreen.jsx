@@ -36,10 +36,10 @@ function SettingsScreen() {
 
   // Dynamic colors based on theme
   const dynamicColors = {
-    containerBg: isDarkMode ? "#0F172A" : "#F9FAFB",
+    containerBg: isDarkMode ? "#0F172A" : "#f4f4f4",
     headerBg: isDarkMode ? "#111827" : "#fff",
     cardBg: isDarkMode ? "#1F2937" : "#fff",
-    text: isDarkMode ? "#F9FAFB" : "#1F2937",
+    text: isDarkMode ? "#f4f4f4" : "#1F2937",
     textSecondary: isDarkMode ? "#9CA3AF" : "#6B7280",
     border: isDarkMode ? "#374151" : "#E5E7EB",
   };
