@@ -13,7 +13,7 @@ interface ThemeContextType {
 }
 
 const LightTheme: ThemeType = {
-  background: "#F9FAFB",
+  background: "#f3ffd1",
   text: "#1F2937",
 };
 
