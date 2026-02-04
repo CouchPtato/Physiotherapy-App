@@ -184,6 +184,9 @@ async def analyze_video(
     start = time.time()
     last_rep = None
 
+    # Keep per-side stages for side-specific exercises (bicep curls)
+    side_stage = {"LEFT": None, "RIGHT": None}
+
     with mp_pose.Pose(model_complexity=1) as pose:
         while True:
             ret, frame = cap.read()
@@ -198,8 +201,8 @@ async def analyze_video(
                 continue
 
             lm = res.pose_landmarks.landmark
-            angles = []
-
+                    angles = []
+            # ---- Squat-like (use hips/knees/ankles) ----
             if exercise_key in ["squat", "knee_extension", "leg_raise"]:
                 for side in ["LEFT", "RIGHT"]:
                     hip = lm[getattr(mp_pose.PoseLandmark, f"{side}_HIP").value]
@@ -211,6 +214,69 @@ async def analyze_video(
                         [ankle.x, ankle.y],
                     ))
 
+            # ---- Bicep curl / shoulder abduction (use shoulder-elbow-wrist) ----
+            if exercise_key in ["bicep_curl", "shoulder_abduction"]:
+                # Compute angles for both sides and pick the one with the most reliable landmarks
+                side_angles = {}
+                side_vis = {}
+                for side in ["LEFT", "RIGHT"]:
+                    try:
+                        s = lm[getattr(mp_pose.PoseLandmark, f"{side}_SHOULDER").value]
+                        e = lm[getattr(mp_pose.PoseLandmark, f"{side}_ELBOW").value]
+                        wpt = lm[getattr(mp_pose.PoseLandmark, f"{side}_WRIST").value]
+                    except Exception:
+                        continue
+
+                    # require reasonable visibility
+                    vis_sum = float(s.visibility + e.visibility + wpt.visibility)
+                    side_vis[side] = vis_sum
+                    a = calculate_angle([s.x, s.y], [e.x, e.y], [wpt.x, wpt.y])
+                    side_angles[side] = a
+
+                # choose side with higher visibility and where movement is seen
+                active_side = None
+                if side_vis:
+                    active_side = max(side_vis, key=side_vis.get)
+
+                if active_side and active_side in side_angles:
+                    angle = float(side_angles[active_side])
+
+                    # manage per-side stage variables
+                    if 'side_stage' not in locals():
+                        side_stage = {"LEFT": None, "RIGHT": None}
+
+                    cur_stage = side_stage.get(active_side)
+
+                    # thresholds: extended > 150, curled < 50
+                    if angle > 150:
+                        side_stage[active_side] = "down"
+                    if angle < 50 and cur_stage == "down":
+                        side_stage[active_side] = "up"
+                        reps += 1
+                        scores.append(calculate_form_score(exercise_key, angle))
+                        now = time.time()
+                        if last_rep:
+                            rep_times.append(now - last_rep)
+                        last_rep = now
+
+                    # Draw skeleton overlay for the active arm
+                    if active_side:
+                        s = lm[getattr(mp_pose.PoseLandmark, f"{active_side}_SHOULDER").value]
+                        e = lm[getattr(mp_pose.PoseLandmark, f"{active_side}_ELBOW").value]
+                        wpt = lm[getattr(mp_pose.PoseLandmark, f"{active_side}_WRIST").value]
+
+                        # convert normalized to pixel coords
+                        sx, sy = int(s.x * w), int(s.y * h)
+                        ex, ey = int(e.x * w), int(e.y * h)
+                        wx, wy = int(wpt.x * w), int(wpt.y * h)
+
+                        # draw lines and points
+                        cv2.line(frame, (sx, sy), (ex, ey), (255, 255, 0), 3)
+                        cv2.line(frame, (ex, ey), (wx, wy), (255, 255, 0), 3)
+                        cv2.circle(frame, (sx, sy), 6, (255, 255, 0), -1)
+                        cv2.circle(frame, (ex, ey), 6, (255, 255, 0), -1)
+                        cv2.circle(frame, (wx, wy), 6, (255, 255, 0), -1)
+
             if angles:
                 angle = float(np.mean(angles))
                 if angle > 160:
@@ -218,6 +284,7 @@ async def analyze_video(
                 if angle < 100 and stage == "up":
                     stage = "down"
                     reps += 1
+                    scores.append(calculate_form_score(exercise_key, angle))
                     now = time.time()
                     if last_rep:
                         rep_times.append(now - last_rep)
@@ -230,6 +297,7 @@ async def analyze_video(
 
     duration = time.time() - start
     avg_time = float(np.mean(rep_times)) if rep_times else 0.0
+    form_score = float(np.mean(scores) / 100.0) if scores else 0.8
 
     return {
         "video_url": f"/videos/{os.path.basename(input_path)}",
@@ -242,6 +310,7 @@ async def analyze_video(
         "sets": sets,
         "duration": duration,
         "avg_time": avg_time,
+        "form_score": form_score,
     }
 
 # ============================================================

@@ -26,19 +26,22 @@ export function usePoseStore(
   processFrame: (pose: PoseFrame) => void;
   angleSV: SharedValue<number>;
   keypointsSV: SharedValue<PoseKeypoint[]>;
+  activeSideSV: SharedValue<"left" | "right" | null>;
 } {
   const stageRef = useRef<"up" | "down" | "-">("-");
   const lastRepTs = useRef<number>(0);
 
   const angleSV = useSharedValue<number>(0);
   const keypointsSV = useSharedValue<PoseKeypoint[]>([]);
+  const activeSideSV = useSharedValue<"left" | "right" | null>(null);
 
   const processFrame = (pose: PoseFrame) => {
-    const res = processPose(exerciseKey, pose, stageRef.current);
+    const res = processPose(exerciseKey, pose, stageRef.current) as any;
 
     stageRef.current = res.stage;
     angleSV.value = res.angle;
     keypointsSV.value = pose.keypoints ?? [];
+    activeSideSV.value = res.activeSide ?? null;
 
     if (res.repDetected) {
       const now = Date.now();
@@ -53,5 +56,6 @@ export function usePoseStore(
     processFrame,
     angleSV,
     keypointsSV,
+    activeSideSV,
   };
 }

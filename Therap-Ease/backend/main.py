@@ -256,6 +256,9 @@ async def analyze_video(
     start = time.time()
     last_rep = None
 
+    # Keep per-side stages for arm-based exercises
+    side_stage = {"LEFT": None, "RIGHT": None}
+
     with mp_pose.Pose(model_complexity=1) as pose:
         while True:
             ret, frame = cap.read()
@@ -283,12 +286,66 @@ async def analyze_video(
                         [ankle.x, ankle.y],
                     ))
 
+            # Bicep curl / shoulder abduction: evaluate both arms and pick active
+            if exercise_key in ["bicep_curl", "shoulder_abduction"]:
+                side_angles = {}
+                side_vis = {}
+                for side in ["LEFT", "RIGHT"]:
+                    try:
+                        s = lm[getattr(mp_pose.PoseLandmark, f"{side}_SHOULDER").value]
+                        e = lm[getattr(mp_pose.PoseLandmark, f"{side}_ELBOW").value]
+                        wpt = lm[getattr(mp_pose.PoseLandmark, f"{side}_WRIST").value]
+                    except Exception:
+                        continue
+
+                    vis_sum = float(s.visibility + e.visibility + wpt.visibility)
+                    side_vis[side] = vis_sum
+                    a = calculate_angle([s.x, s.y], [e.x, e.y], [wpt.x, wpt.y])
+                    side_angles[side] = a
+
+                active_side = None
+                if side_vis:
+                    active_side = max(side_vis, key=side_vis.get)
+
+                if active_side and active_side in side_angles:
+                    angle = float(side_angles[active_side])
+
+                    cur_stage = side_stage.get(active_side)
+
+                    if angle > 150:
+                        side_stage[active_side] = "down"
+                    if angle < 50 and cur_stage == "down":
+                        side_stage[active_side] = "up"
+                        reps += 1
+                        scores.append(calculate_form_score(exercise_key, angle))
+                        now = time.time()
+                        if last_rep is not None:
+                            rep_times.append(now - last_rep)
+                        last_rep = now
+
+                    # Draw overlay for active arm
+                    if active_side:
+                        s = lm[getattr(mp_pose.PoseLandmark, f"{active_side}_SHOULDER").value]
+                        e = lm[getattr(mp_pose.PoseLandmark, f"{active_side}_ELBOW").value]
+                        wpt = lm[getattr(mp_pose.PoseLandmark, f"{active_side}_WRIST").value]
+
+                        sx, sy = int(s.x * w), int(s.y * h)
+                        ex, ey = int(e.x * w), int(e.y * h)
+                        wx, wy = int(wpt.x * w), int(wpt.y * h)
+
+                        cv2.line(frame, (sx, sy), (ex, ey), (255, 255, 0), 3)
+                        cv2.line(frame, (ex, ey), (wx, wy), (255, 255, 0), 3)
+                        cv2.circle(frame, (sx, sy), 6, (255, 255, 0), -1)
+                        cv2.circle(frame, (ex, ey), 6, (255, 255, 0), -1)
+                        cv2.circle(frame, (wx, wy), 6, (255, 255, 0), -1)
+
             if angles:
                 angle = float(np.mean(angles))
                 if angle > 160:
                     stage = "up"
                 if angle < 100 and stage == "up":
                     reps += 1
+                    scores.append(calculate_form_score(exercise_key, angle))
                     if last_rep is not None:
                         rep_times.append(time.time() - last_rep)
                     last_rep = time.time()
@@ -300,6 +357,7 @@ async def analyze_video(
 
     duration = time.time() - start
     avg_time = float(np.mean(rep_times)) if rep_times else 0.0
+    form_score = float(np.mean(scores) / 100.0) if scores else 0.8
 
     return {
         "video_url": f"/videos/{os.path.basename(input_path)}",
@@ -312,6 +370,7 @@ async def analyze_video(
         "sets": sets,
         "duration": duration,
         "avg_time": avg_time,
+        "form_score": form_score,
     }
 
 # ================= PDF REPORT =================

@@ -13,6 +13,7 @@ export type PoseResult = {
   angle: number;
   stage: "up" | "down" | "-";
   repDetected: boolean;
+  activeSide?: "left" | "right" | null;
 };
 
 const kp = (pose: PoseFrame, name: string) =>
@@ -58,18 +59,33 @@ export function processPose(
     exercise === "bicep_curl" ||
     exercise === "shoulder_abduction"
   ) {
-    const s = kp(pose, "left_shoulder");
-    const e = kp(pose, "left_elbow");
-    const w = kp(pose, "left_wrist");
-    if (!s || !e || !w) return { angle: 0, stage, repDetected };
+    // Check both sides and choose the side with the most valid keypoints / movement
+    const sides: Array<"left" | "right"> = ["left", "right"];
+    let best: { side: "left" | "right"; angle: number; valid: boolean } | null = null;
 
-    angle = angle3(s, e, w);
+    for (const side of sides) {
+      const s = kp(pose, `${side}_shoulder`);
+      const e = kp(pose, `${side}_elbow`);
+      const w = kp(pose, `${side}_wrist`);
+      if (!s || !e || !w) continue;
+      const a = angle3(s, e, w);
+      if (!best || a < best.angle) {
+        best = { side, angle: a, valid: true };
+      }
+    }
+
+    if (!best) return { angle: 0, stage, repDetected, activeSide: null };
+
+    // Use the chosen side for angle and rep detection
+    angle = best.angle;
 
     if (angle > 150) stage = "down";
     if (angle < 50 && prevStage === "down") {
       stage = "up";
       repDetected = true;
     }
+
+    return { angle, stage, repDetected, activeSide: best.side };
   }
 
   if (exercise === "side_bend") {

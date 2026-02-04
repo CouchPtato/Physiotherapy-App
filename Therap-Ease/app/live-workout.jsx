@@ -81,7 +81,7 @@ export default function LiveWorkoutScreen() {
     });
   };
 
-  const { processFrame, angleSV, keypointsSV, lastFormScoreRef } = usePoseStore(exerciseKey, onRep);
+  const { processFrame, angleSV, keypointsSV, activeSideSV, lastFormScoreRef } = usePoseStore(exerciseKey, onRep);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -238,10 +238,10 @@ export default function LiveWorkoutScreen() {
         <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
       )}
 
-      <PoseSkiaOverlay keypointsSV={keypointsSV} />
+      <PoseSkiaOverlay keypointsSV={keypointsSV} activeSideSV={activeSideSV} />
 
       {/* Header Controls */}
-      <View style={[styles.headerControls, { backgroundColor: `rgba(0,0,0,0.5)` }]}>
+      <View style={styles.headerControls}>
         <TouchableOpacity style={styles.controlBtn} onPress={goBack}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
   },
   headerControls: {
     position: "absolute",
-    top: 16,
+    top: 32,
     left: 16,
     right: 16,
     flexDirection: "row",
