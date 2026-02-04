@@ -27,6 +27,7 @@ export function usePoseStore(
   angleSV: SharedValue<number>;
   keypointsSV: SharedValue<PoseKeypoint[]>;
   activeSideSV: SharedValue<"left" | "right" | null>;
+  lastFormScoreRef: { current: number | null };
 } {
   const stageRef = useRef<"up" | "down" | "-">("-");
   const lastRepTs = useRef<number>(0);
@@ -35,6 +36,29 @@ export function usePoseStore(
   const keypointsSV = useSharedValue<PoseKeypoint[]>([]);
   const activeSideSV = useSharedValue<"left" | "right" | null>(null);
 
+  // Last computed per-frame form score (0..1)
+  const lastFormScoreRef = useRef<number | null>(null);
+
+  const computeFormScore = (exercise: string, angle: number) => {
+    const idealRanges: Record<string, [number, number]> = {
+      bicep_curl: [30, 160],
+      squat: [70, 160],
+      shoulder_abduction: [70, 160],
+      knee_extension: [0, 160],
+      leg_raise: [40, 150],
+      side_bend: [10, 35],
+    };
+
+    const [low, high] = idealRanges[exercise] ?? [60, 150];
+    let diff = 0;
+    if (angle < low) diff = low - angle;
+    else if (angle > high) diff = angle - high;
+    else diff = 0;
+
+    const score = Math.max(0, 1 - diff / 60);
+    return score; // 0..1
+  };
+
   const processFrame = (pose: PoseFrame) => {
     const res = processPose(exerciseKey, pose, stageRef.current) as any;
 
@@ -42,6 +66,13 @@ export function usePoseStore(
     angleSV.value = res.angle;
     keypointsSV.value = pose.keypoints ?? [];
     activeSideSV.value = res.activeSide ?? null;
+
+    // compute and set last form score per frame
+    if (res.angle && res.angle > 0) {
+      lastFormScoreRef.current = computeFormScore(exerciseKey, res.angle);
+    } else {
+      lastFormScoreRef.current = null;
+    }
 
     if (res.repDetected) {
       const now = Date.now();
@@ -57,5 +88,6 @@ export function usePoseStore(
     angleSV,
     keypointsSV,
     activeSideSV,
+    lastFormScoreRef,
   };
 }

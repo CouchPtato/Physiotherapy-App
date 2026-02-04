@@ -17,15 +17,18 @@ type PoseKeypoint = {
 type PoseSkiaOverlayProps = {
   keypointsSV: SharedValue<PoseKeypoint[]>;
   activeSideSV?: SharedValue<"left" | "right" | null>;
+  mirror?: boolean;
 };
 
 /* ---------------- HELPERS ---------------- */
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get("window");
 
-function toCanvas(p: PoseKeypoint) {
+function toCanvas(p: PoseKeypoint, mirror = false) {
   // Accept either normalized (0..1) or pixel coords
-  const cx = p.x <= 1 ? p.x * SCREEN_W : p.x;
-  const cy = p.y <= 1 ? p.y * SCREEN_H : p.y;
+  const nx = p.x <= 1 ? p.x * SCREEN_W : p.x;
+  const ny = p.y <= 1 ? p.y * SCREEN_H : p.y;
+  const cx = mirror ? SCREEN_W - nx : nx;
+  const cy = ny;
   return { cx, cy };
 }
 
@@ -34,6 +37,7 @@ function toCanvas(p: PoseKeypoint) {
 export function PoseSkiaOverlay({
   keypointsSV,
   activeSideSV,
+  mirror,
 }: PoseSkiaOverlayProps) {
   const points = useDerivedValue<PoseKeypoint[]>(() => {
     return keypointsSV.value ?? [];
@@ -43,18 +47,18 @@ export function PoseSkiaOverlay({
 
   const kp = (name: string) => points.value.find((k) => k.name === name);
 
-  const makeArmPath = (side: "left" | "right") => {
+  const makeArmPath = (side: "left" | "right", mirror = false) => {
     const s = kp(`${side}_shoulder`);
     const e = kp(`${side}_elbow`);
     const w = kp(`${side}_wrist`);
     const path = Skia.Path.Make();
     if (s && e) {
-      const { cx, cy } = toCanvas(s);
+      const { cx, cy } = toCanvas(s, mirror);
       path.moveTo(cx, cy);
-      const { cx: ex, cy: ey } = toCanvas(e);
+      const { cx: ex, cy: ey } = toCanvas(e, mirror);
       path.lineTo(ex, ey);
       if (w) {
-        const { cx: wx, cy: wy } = toCanvas(w);
+        const { cx: wx, cy: wy } = toCanvas(w, mirror);
         path.lineTo(wx, wy);
       }
     }
@@ -70,17 +74,12 @@ export function PoseSkiaOverlay({
         const w = points.value.find((k) => k.name === `${side}_wrist`);
         if (!s || !e) return null;
 
-        const path = Skia.Path.Make();
-        const { cx: sx, cy: sy } = toCanvas(s);
-        path.moveTo(sx, sy);
-        const { cx: ex, cy: ey } = toCanvas(e);
-        path.lineTo(ex, ey);
-        if (w) {
-          const { cx: wx, cy: wy } = toCanvas(w);
-          path.lineTo(wx, wy);
-        }
+        const path = makeArmPath(side, mirror ?? false);
 
-        const isActive = activeSide.value === side;
+        // When mirror is true the visual side is swapped, so check activeSide accordingly
+        const displayedForActiveCheck = (mirror ?? false) ? (side === "left" ? "right" : "left") : side;
+        const isActive = activeSide.value === displayedForActiveCheck;
+
         return (
           <Path
             key={side}
@@ -96,7 +95,7 @@ export function PoseSkiaOverlay({
       {/* Draw keypoint circles */}
       {points.value.map((p: PoseKeypoint, i: number) => {
         if ((p.score ?? 1) <= 0.4) return null;
-        const { cx, cy } = toCanvas(p);
+        const { cx, cy } = toCanvas(p, mirror ?? false);
         return <Circle key={i} cx={cx} cy={cy} r={4} color="cyan" />;
       })}
     </Canvas>

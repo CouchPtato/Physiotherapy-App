@@ -58,6 +58,7 @@ export default function LiveWorkoutScreen() {
   const [elapsed, setElapsed] = useState(0);
   const [running, setRunning] = useState(true);
   const [workoutEnded, setWorkoutEnded] = useState(false);
+  const [showSetModal, setShowSetModal] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
@@ -238,7 +239,7 @@ export default function LiveWorkoutScreen() {
         <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
       )}
 
-      <PoseSkiaOverlay keypointsSV={keypointsSV} activeSideSV={activeSideSV} />
+      <PoseSkiaOverlay keypointsSV={keypointsSV} activeSideSV={activeSideSV} mirror={facing === 'front'} />
 
       {/* Header Controls */}
       <View style={styles.headerControls}>
