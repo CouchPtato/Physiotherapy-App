@@ -65,20 +65,73 @@ export function PoseSkiaOverlay({
     return path;
   };
 
+  // Decide which side(s) to render based on confidence and reported active side
+  const leftScores = [kp("left_shoulder")?.score ?? 0, kp("left_elbow")?.score ?? 0, kp("left_wrist")?.score ?? 0];
+  const rightScores = [kp("right_shoulder")?.score ?? 0, kp("right_elbow")?.score ?? 0, kp("right_wrist")?.score ?? 0];
+  const leftAvg = leftScores.reduce((a, b) => a + b, 0) / 3;
+  const rightAvg = rightScores.reduce((a, b) => a + b, 0) / 3;
+
+  const reportedActive = activeSide.value;
+  const displayedActive = reportedActive ? (mirror ? (reportedActive === "left" ? "right" : "left") : reportedActive) : null;
+
+  let preferSingleSide = false;
+  let bestSide: "left" | "right" = leftAvg >= rightAvg ? "left" : "right";
+  const visRatio = Math.max(leftAvg, rightAvg) / (Math.min(leftAvg, rightAvg) + 1e-6);
+  if (displayedActive) {
+    preferSingleSide = true;
+    bestSide = displayedActive as "left" | "right";
+  } else if ((leftAvg >= 0.25 && rightAvg < 0.15) || (rightAvg >= 0.25 && leftAvg < 0.15) || visRatio > 1.5) {
+    preferSingleSide = true;
+    bestSide = leftAvg >= rightAvg ? "left" : "right";
+  }
+
+  const sideVisible = {
+    left: leftAvg >= 0.12 || bestSide === "left",
+    right: rightAvg >= 0.12 || bestSide === "right",
+  };
+
   return (
     <Canvas style={StyleSheet.absoluteFillObject}>
       {/* Draw arm skeletons (left + right) */}
       {(["left", "right"] as const).map((side) => {
+        // Skip side if visibility is too low and not chosen
+        if (preferSingleSide && side !== bestSide) return null;
+        if (!sideVisible[side]) return null;
+
         const s = points.value.find((k) => k.name === `${side}_shoulder`);
         const e = points.value.find((k) => k.name === `${side}_elbow`);
         const w = points.value.find((k) => k.name === `${side}_wrist`);
-        if (!s || !e) return null;
 
-        const path = makeArmPath(side, mirror ?? false);
+        // build path from any available connected keypoints so partial tracking still shows something
+        const path = Skia.Path.Make();
+        let hasSegment = false;
+        if (s && e) {
+          const { cx, cy } = toCanvas(s, mirror ?? false);
+          path.moveTo(cx, cy);
+          const { cx: ex, cy: ey } = toCanvas(e, mirror ?? false);
+          path.lineTo(ex, ey);
+          hasSegment = true;
+          if (w) {
+            const { cx: wx, cy: wy } = toCanvas(w, mirror ?? false);
+            path.lineTo(wx, wy);
+          }
+        } else if (e && w) {
+          const { cx, cy } = toCanvas(e, mirror ?? false);
+          path.moveTo(cx, cy);
+          const { cx: wx, cy: wy } = toCanvas(w, mirror ?? false);
+          path.lineTo(wx, wy);
+          hasSegment = true;
+        } else if (s && w) {
+          const { cx, cy } = toCanvas(s, mirror ?? false);
+          path.moveTo(cx, cy);
+          const { cx: wx, cy: wy } = toCanvas(w, mirror ?? false);
+          path.lineTo(wx, wy);
+          hasSegment = true;
+        }
 
-        // When mirror is true the visual side is swapped, so check activeSide accordingly
-        const displayedForActiveCheck = (mirror ?? false) ? (side === "left" ? "right" : "left") : side;
-        const isActive = activeSide.value === displayedForActiveCheck;
+        if (!hasSegment) return null;
+
+        const isActive = displayedActive ? displayedActive === side : (preferSingleSide && side === bestSide);
 
         return (
           <Path
@@ -88,15 +141,21 @@ export function PoseSkiaOverlay({
             strokeWidth={isActive ? 4 : 2}
             strokeJoin={"round"}
             color={isActive ? "cyan" : "rgba(255,255,255,0.6)"}
+            opacity={isActive ? 1 : 0.6}
           />
         );
       })}
 
       {/* Draw keypoint circles */}
       {points.value.map((p: PoseKeypoint, i: number) => {
-        if ((p.score ?? 1) <= 0.4) return null;
+        if (!p.name) return null;
+        if (preferSingleSide && !p.name.startsWith(bestSide)) return null;
+        const score = p.score ?? 0;
+        if (score <= 0.05) return null;
         const { cx, cy } = toCanvas(p, mirror ?? false);
-        return <Circle key={i} cx={cx} cy={cy} r={4} color="cyan" />;
+        const alpha = Math.max(0.25, Math.min(1, score));
+        const fill = `rgba(0,255,255,${alpha})`;
+        return <Circle key={i} cx={cx} cy={cy} r={4 + (score > 0.8 ? 2 : 0)} color={fill} />;
       })}
     </Canvas>
   );

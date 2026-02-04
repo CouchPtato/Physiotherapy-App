@@ -11,7 +11,7 @@ import { useTheme } from "../hooks/use-theme";
 
 import { API_BASE } from "../constants/api";
 
-const FRAME_INTERVAL = 300;
+const FRAME_INTERVAL = 100;
 const MOTION_TIMEOUT_MS = 800;
 
 // Colors
@@ -102,7 +102,7 @@ export default function LiveWorkoutScreen() {
     try {
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.25,
+        quality: 0.12,
         skipProcessing: true,
         mute: true,
       });
