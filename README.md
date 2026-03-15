@@ -46,10 +46,18 @@ Therap-Ease is an intelligent physiotherapy platform designed to modernize exerc
 
 ---
 
-## 📷 Screenshots
+## 📷 App Screenshots
+### Authentication & Home
+<p align="center"> <img src="media/Screenshot_2026-02-04-17-46-39-293_host.exp.exponent.jpg.jpeg" width="250"/> <img src="media/Screenshot_2026-02-04-17-47-41-269_host.exp.exponent.jpg.jpeg" width="250"/> </p> <p align="center"> <b>Login Screen</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Home Dashboard</b> </p>
 
+### Upload & Exercise Tracking
+<p align="center"> <img src="media/Screenshot_2026-02-04-17-49-06-309_host.exp.exponent.jpg.jpeg" width="250"/> <img src="media/Screenshot_2026-02-04-18-07-01-920_host.exp.exponent.jpg.jpeg" width="250"/> <img src="media/Screenshot_2026-02-04-18-07-10-937_host.exp.exponent.jpg.jpeg" width="250"/> </p> <p align="center"> <b>Upload Video</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Tracked Exercise</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Exercise Results</b> </p>
 
+### Live Pose Tracking
+<p align="center"> <img src="media/IMG_20260204_200048.jpg.jpeg" width="300"/> <img src="media/IMG_20260204_200150.jpg.jpeg" width="300"/> </p> <p align="center"> <b>Live Tracking</b> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <b>Real-Time Pose Detection</b> </p>
 
+### Workout Completion
+<p align="center"> <img src="media/Screenshot_2026-02-04-20-10-03-636_host.exp.exponent.jpg.jpeg" width="250"/> </p> <p align="center"> <b>Workout Completed Screen</b> </p>
 ---
 
 ## 📦 Getting Started
