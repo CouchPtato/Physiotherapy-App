@@ -47,6 +47,57 @@ export function PoseSkiaOverlay({
 
   const kp = (name: string) => points.value.find((k) => k.name === name);
 
+  // Smoothed positions to avoid jumpy / laggy skeleton — lerp between updates
+  const smoothedRef = React.useRef<Record<string, { x: number; y: number; score: number }>>({});
+  const [, setTick] = React.useState(0);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const alpha = 0.4; // smoothing factor (0..1) higher -> snappier
+
+    const step = () => {
+      const cur = points.value ?? [];
+      let changed = false;
+
+      const seen: Record<string, boolean> = {};
+      cur.forEach((p) => {
+        if (!p.name) return;
+        const key = p.name;
+        seen[key] = true;
+        const tgtX = p.x <= 1 ? p.x * SCREEN_W : p.x;
+        const tgtY = p.y <= 1 ? p.y * SCREEN_H : p.y;
+        const prev = smoothedRef.current[key];
+        if (!prev) {
+          smoothedRef.current[key] = { x: tgtX, y: tgtY, score: p.score ?? 0 };
+          changed = true;
+        } else {
+          const nx = prev.x + (tgtX - prev.x) * alpha;
+          const ny = prev.y + (tgtY - prev.y) * alpha;
+          const ns = (prev.score + (p.score ?? 0)) / 2;
+          if (Math.abs(nx - prev.x) > 0.5 || Math.abs(ny - prev.y) > 0.5) changed = true;
+          smoothedRef.current[key] = { x: nx, y: ny, score: ns };
+        }
+      });
+
+      // remove stale keys
+      Object.keys(smoothedRef.current).forEach((k) => {
+        if (!seen[k]) {
+          delete smoothedRef.current[k];
+          changed = true;
+        }
+      });
+
+      if (changed && mounted) setTick((t) => t + 1);
+      if (mounted) requestAnimationFrame(step);
+    };
+
+    const id = requestAnimationFrame(step);
+    return () => {
+      mounted = false;
+      cancelAnimationFrame(id);
+    };
+  }, [points]);
+
   const makeArmPath = (side: "left" | "right", mirror = false) => {
     const s = kp(`${side}_shoulder`);
     const e = kp(`${side}_elbow`);
@@ -102,29 +153,34 @@ export function PoseSkiaOverlay({
         const e = points.value.find((k) => k.name === `${side}_elbow`);
         const w = points.value.find((k) => k.name === `${side}_wrist`);
 
-        // build path from any available connected keypoints so partial tracking still shows something
+        // build path from smoothed keypoints so skeleton animates smoothly
+        const smoothed = smoothedRef.current;
+        const s_s = smoothed[`${side}_shoulder`];
+        const e_s = smoothed[`${side}_elbow`];
+        const w_s = smoothed[`${side}_wrist`];
+
         const path = Skia.Path.Make();
         let hasSegment = false;
-        if (s && e) {
-          const { cx, cy } = toCanvas(s, mirror ?? false);
+        if (s_s && e_s) {
+          const { cx, cy } = { cx: mirror ? SCREEN_W - s_s.x : s_s.x, cy: s_s.y };
           path.moveTo(cx, cy);
-          const { cx: ex, cy: ey } = toCanvas(e, mirror ?? false);
+          const { cx: ex, cy: ey } = { cx: mirror ? SCREEN_W - e_s.x : e_s.x, cy: e_s.y };
           path.lineTo(ex, ey);
           hasSegment = true;
-          if (w) {
-            const { cx: wx, cy: wy } = toCanvas(w, mirror ?? false);
+          if (w_s) {
+            const { cx: wx, cy: wy } = { cx: mirror ? SCREEN_W - w_s.x : w_s.x, cy: w_s.y };
             path.lineTo(wx, wy);
           }
-        } else if (e && w) {
-          const { cx, cy } = toCanvas(e, mirror ?? false);
+        } else if (e_s && w_s) {
+          const { cx, cy } = { cx: mirror ? SCREEN_W - e_s.x : e_s.x, cy: e_s.y };
           path.moveTo(cx, cy);
-          const { cx: wx, cy: wy } = toCanvas(w, mirror ?? false);
+          const { cx: wx, cy: wy } = { cx: mirror ? SCREEN_W - w_s.x : w_s.x, cy: w_s.y };
           path.lineTo(wx, wy);
           hasSegment = true;
-        } else if (s && w) {
-          const { cx, cy } = toCanvas(s, mirror ?? false);
+        } else if (s_s && w_s) {
+          const { cx, cy } = { cx: mirror ? SCREEN_W - s_s.x : s_s.x, cy: s_s.y };
           path.moveTo(cx, cy);
-          const { cx: wx, cy: wy } = toCanvas(w, mirror ?? false);
+          const { cx: wx, cy: wy } = { cx: mirror ? SCREEN_W - w_s.x : w_s.x, cy: w_s.y };
           path.lineTo(wx, wy);
           hasSegment = true;
         }
@@ -146,16 +202,16 @@ export function PoseSkiaOverlay({
         );
       })}
 
-      {/* Draw keypoint circles */}
-      {points.value.map((p: PoseKeypoint, i: number) => {
-        if (!p.name) return null;
-        if (preferSingleSide && !p.name.startsWith(bestSide)) return null;
-        const score = p.score ?? 0;
+      {/* Draw keypoint circles (from smoothed positions) */}
+      {Object.entries(smoothedRef.current).map(([name, s], i) => {
+        if (preferSingleSide && !name.startsWith(bestSide)) return null;
+        const score = s.score ?? 0;
         if (score <= 0.05) return null;
-        const { cx, cy } = toCanvas(p, mirror ?? false);
+        const cx = mirror ? SCREEN_W - s.x : s.x;
+        const cy = s.y;
         const alpha = Math.max(0.25, Math.min(1, score));
         const fill = `rgba(0,255,255,${alpha})`;
-        return <Circle key={i} cx={cx} cy={cy} r={4 + (score > 0.8 ? 2 : 0)} color={fill} />;
+        return <Circle key={name} cx={cx} cy={cy} r={4 + (score > 0.8 ? 2 : 0)} color={fill} />;
       })}
     </Canvas>
   );

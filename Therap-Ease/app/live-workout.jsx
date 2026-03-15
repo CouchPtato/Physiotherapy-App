@@ -63,26 +63,70 @@ export default function LiveWorkoutScreen() {
   const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const lastPoseTsRef = useRef(0);
+  const repProcessingRef = useRef(false);
+  const setPendingRef = useRef(false);
   const [motionUI, setMotionUI] = useState(false);
+
+  const [showToast, setShowToast] = useState(false);
+  const [toastText, setToastText] = useState("");
+  const toastTimerRef = useRef(null);
+
+  // Pause preview when a set completes to avoid flicker/blinking
+  const [previewPaused, setPreviewPaused] = useState(false);
 
   const totalFormScoreRef = useRef(0);
   const formFrameCountRef = useRef(0);
 
   const onRep = () => {
-    setRepsThisSet((r) => {
-      const next = r + 1;
-      setTotalReps((t) => t + 1);
-      if (next >= repsTarget) {
-        setRunning(false);
-        if (currentSet >= totalSets) {
-          setWorkoutEnded(true);
+    // Prevent counting additional reps while waiting for user to start next set
+    if (setPendingRef.current) return;
+    // Prevent concurrent rep handling from multiple in-flight frames
+    if (repProcessingRef.current) return;
+
+    try {
+      repProcessingRef.current = true;
+
+      setRepsThisSet((r) => {
+        const next = r + 1;
+        setTotalReps((t) => t + 1);
+        if (next >= repsTarget) {
+          // mark pending immediately to block further reps
+          setPendingRef.current = true;
+          setRunning(false);
+
+          // stop capture immediately and pause preview to avoid blinking
+          stoppedRef.current = true;
+          if (frameTimerRef.current) {
+            clearInterval(frameTimerRef.current);
+            frameTimerRef.current = null;
+          }
+          setPreviewPaused(true);
+
+          // show brief toast to notify user
+          const text = currentSet >= totalSets ? "Workout complete!" : "Set complete — start next set or end workout";
+          setToastText(text);
+          setShowToast(true);
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => {
+            setShowToast(false);
+            toastTimerRef.current = null;
+          }, 1800);
+
+          if (currentSet >= totalSets) {
+            setWorkoutEnded(true);
+          } else {
+            setShowSetModal(true);
+          }
         }
-      }
-      return next;
-    });
+        return next;
+      });
+    } finally {
+      // allow future reps unless we're pending for a set completion
+      repProcessingRef.current = false;
+    }
   };
 
-  const { processFrame, angleSV, keypointsSV, activeSideSV, lastFormScoreRef } = usePoseStore(exerciseKey, onRep);
+  const { processFrame, angleSV, keypointsSV, activeSideSV, lastFormScoreRef } = usePoseStore(exerciseKey, onRep, { preventRepRef: setPendingRef });
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -145,6 +189,8 @@ export default function LiveWorkoutScreen() {
     };
   }, [running, workoutEnded]);
 
+
+
   const toggleCamera = () => setFacing((f) => (f === "front" ? "back" : "front"));
 
   const hardStopCamera = () => {
@@ -156,12 +202,36 @@ export default function LiveWorkoutScreen() {
   };
 
   const endWorkout = () => {
+    // close any open set modal
+    setShowSetModal(false);
+    repProcessingRef.current = false;
+    setPendingRef.current = false;
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setShowToast(false);
+    setToastText("");
+
     hardStopCamera();
     setRunning(false);
     setWorkoutEnded(true);
+    setPreviewPaused(false);
   };
 
   const startNextSet = () => {
+    // close the modal and allow reps again
+    setShowSetModal(false);
+    repProcessingRef.current = false;
+    setPendingRef.current = false;
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setShowToast(false);
+    setToastText("");
+
+    setPreviewPaused(false);
     setCurrentSet((s) => s + 1);
     setRepsThisSet(0);
     setRunning(true);
@@ -206,6 +276,16 @@ export default function LiveWorkoutScreen() {
 
   const repeatWorkout = () => {
     stoppedRef.current = false;
+    repProcessingRef.current = false;
+    setPendingRef.current = false;
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    setShowToast(false);
+    setToastText("");
+
+    setPreviewPaused(false);
     setCurrentSet(1);
     setRepsThisSet(0);
     setTotalReps(0);
@@ -235,7 +315,7 @@ export default function LiveWorkoutScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: dynamicColors.containerBg }]}>
-      {!workoutEnded && (
+      {!workoutEnded && !previewPaused && (
         <CameraView ref={cameraRef} style={styles.camera} facing={facing} />
       )}
 
@@ -291,12 +371,47 @@ export default function LiveWorkoutScreen() {
         <Text style={styles.motionText}>{motionUI ? "Motion Detected" : "No Motion"}</Text>
       </View>
 
+      {/* Toast */}
+      {showToast && (
+        <View style={styles.toast} pointerEvents="none">
+          <Text style={styles.toastText}>{toastText}</Text>
+        </View>
+      )}
+
       {/* End Workout Button */}
       {!workoutEnded && (
         <TouchableOpacity style={styles.endBtn} onPress={endWorkout}>
           <Ionicons name="stop-circle" size={20} color="#fff" />
           <Text style={styles.endBtnText}>End Workout</Text>
         </TouchableOpacity>
+      )}
+
+      {/* Set Complete Modal */}
+      {showSetModal && (
+        <View style={styles.setModal}>
+          <View style={styles.setModalContent}>
+            <Text style={styles.modalTitle}>Set Complete 🎉</Text>
+            <Text style={styles.modalSub}>Would you like to start the next set or end the workout?</Text>
+
+            <View style={[styles.buttonGroup, { marginTop: 20 }]}>
+              <TouchableOpacity
+                style={[styles.button, styles.primaryBtn]}
+                onPress={() => { setShowSetModal(false); startNextSet(); }}
+              >
+                <Ionicons name="play" size={18} color="#fff" />
+                <Text style={styles.buttonText}>Start Next Set</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.button, styles.secondaryBtn]}
+                onPress={() => { setShowSetModal(false); endWorkout(); }}
+              >
+                <Ionicons name="stop" size={18} color={COLORS.primary} />
+                <Text style={[styles.buttonText, { color: COLORS.primary }]}>End Workout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
       )}
 
       {/* Workout Complete Modal */}
@@ -459,6 +574,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
+  toast: {
+    position: "absolute",
+    bottom: 90,
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.8)",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    zIndex: 70,
+  },
+  toastText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
   endBtn: {
     position: "absolute",
     bottom: 20,
@@ -503,6 +633,30 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     color: COLORS.dark,
     marginBottom: 20,
+    textAlign: "center",
+  },
+  /* Set modal (smaller) */
+  setModal: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 55,
+  },
+  setModalContent: {
+    backgroundColor: COLORS.light,
+    borderRadius: 16,
+    padding: 18,
+    width: "80%",
+    alignItems: "center",
+  },
+  modalSub: {
+    fontSize: 14,
+    color: COLORS.dark,
     textAlign: "center",
   },
   summaryStats: {

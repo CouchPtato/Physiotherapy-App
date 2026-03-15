@@ -21,7 +21,8 @@ type OnRepCallback = () => void;
 
 export function usePoseStore(
   exerciseKey: string,
-  onRep: OnRepCallback
+  onRep: OnRepCallback,
+  options?: { preventRepRef?: { current: boolean } }
 ): {
   processFrame: (pose: PoseFrame) => void;
   angleSV: SharedValue<number>;
@@ -29,6 +30,7 @@ export function usePoseStore(
   activeSideSV: SharedValue<"left" | "right" | null>;
   lastFormScoreRef: { current: number | null };
 } {
+  const preventRepRef = options?.preventRepRef;
   const stageRef = useRef<"up" | "down" | "-">("-");
   const lastRepTs = useRef<number>(0);
 
@@ -75,6 +77,11 @@ export function usePoseStore(
     }
 
     if (res.repDetected) {
+      // Don't call onRep if a higher-level flow has requested rep prevention
+      if (preventRepRef?.current) {
+        return;
+      }
+
       const now = Date.now();
       if (now - lastRepTs.current > 700) {
         lastRepTs.current = now;
